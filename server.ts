@@ -179,23 +179,25 @@ app.get("/api/voices", async (req, res) => {
 });
 
 export async function startServer() {
-  if (process.env.NODE_ENV !== "production" && process.env.NODE_ENV !== "test") {
-    const vite = await createViteServer({
-      server: { middlewareMode: true },
-      appType: "spa",
-    });
-    app.use(vite.middlewares);
-  } else if (process.env.NODE_ENV === "production") {
-    const distPath = path.join(process.cwd(), "dist");
-    app.use(express.static(distPath));
-    app.get("*", (req, res) => {
-      res.sendFile(path.join(distPath, "index.html"));
-    });
+  if (process.env.API_ONLY !== "true") {
+    if (process.env.NODE_ENV !== "production" && process.env.NODE_ENV !== "test") {
+      const vite = await createViteServer({
+        server: { middlewareMode: true },
+        appType: "spa",
+      });
+      app.use(vite.middlewares);
+    } else if (process.env.NODE_ENV === "production") {
+      const distPath = path.join(process.cwd(), "dist");
+      app.use(express.static(distPath));
+      app.get("*", (req, res) => {
+        res.sendFile(path.join(distPath, "index.html"));
+      });
+    }
   }
 
   if (process.env.NODE_ENV !== "test") {
     app.listen(PORT, "0.0.0.0", () => {
-      console.log(`Server running on http://localhost:${PORT}`);
+      console.log(`Server running on http://localhost:${PORT}${process.env.API_ONLY === "true" ? " (API Only Mode)" : ""}`);
     });
   }
 }

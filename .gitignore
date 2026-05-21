@@ -12,5 +12,4 @@ coverage/
 *.db
 
 # Test reports
-tests/reports/
 html/

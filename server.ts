@@ -5,9 +5,37 @@ import os from "os";
 import { createServer as createViteServer } from "vite";
 import { KokoroTTS, TextSplitterStream } from "kokoro-js";
 import multer from "multer";
+import sqlite3 from "sqlite3";
+import { open } from "sqlite";
 
 const app = express();
 const PORT = 3000;
+
+// Persistent directory for models and database
+const dataDir = path.join(process.cwd(), "data");
+const modelsDir = path.join(dataDir, "models");
+
+// Initialize SQLite Database
+let db: any;
+async function initDb() {
+  // Ensure persistent directories exist before initializing DB
+  await fs.mkdir(modelsDir, { recursive: true });
+
+  db = await open({
+    filename: path.join(dataDir, "metadata.db"),
+    driver: sqlite3.Database,
+  });
+  await db.exec(`
+    CREATE TABLE IF NOT EXISTS voices (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      voice_name TEXT NOT NULL,
+      file_path TEXT NOT NULL,
+      original_filename TEXT NOT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+}
+initDb().catch(console.error);
 app.use(express.json());
 
 // Initialize Kokoro TTS (lazy load)
@@ -103,7 +131,7 @@ app.post("/api/tts", async (req, res) => {
 
 // Admin training route - Upload custom voice sample
 app.post("/api/train", upload.single("sample"), async (req, res) => {
-  const { username, password } = req.body;
+  const { username, password, voiceName } = req.body;
   if (username !== "admin" || password !== "password") {
     return res.status(401).json({ error: "Invalid credentials" });
   }
@@ -112,16 +140,39 @@ app.post("/api/train", upload.single("sample"), async (req, res) => {
     return res.status(400).json({ error: "No sample file uploaded" });
   }
 
+  const finalVoiceName = voiceName || `voice_${Date.now()}`;
+
   try {
     // In a real application we would pass this to kokoro model to extract embeddings
     // Here we simulate the processing time
     console.log(`Received sample file for training: ${req.file.path}`);
     await new Promise(resolve => setTimeout(resolve, 2000));
     
-    // Cleanup
-    await fs.unlink(req.file.path).catch(console.error);
+    const targetFileName = `${finalVoiceName}_${Date.now()}${path.extname(req.file.originalname)}`;
+    const targetFilePath = path.join(modelsDir, targetFileName);
+
+    // Move uploaded file to persistent storage safely across volumes
+    await fs.copyFile(req.file.path, targetFilePath);
+    await fs.unlink(req.file.path);
     
-    res.json({ success: true, message: "Voice embedding trained successfully" });
+    // Insert metadata into DB
+    await db.run(
+      `INSERT INTO voices (voice_name, file_path, original_filename) VALUES (?, ?, ?)`,
+      [finalVoiceName, targetFilePath, req.file.originalname]
+    );
+
+    res.json({ success: true, message: "Voice embedding trained successfully", voiceName: finalVoiceName });
+  } catch (err: any) {
+    console.error(err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Route to get list of trained models
+app.get("/api/voices", async (req, res) => {
+  try {
+    const voices = await db.all("SELECT * FROM voices ORDER BY created_at DESC");
+    res.json(voices);
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }

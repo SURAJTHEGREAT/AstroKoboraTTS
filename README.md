@@ -1,20 +1,19 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://ai.google.dev/static/site-assets/images/share-ais-513315318.png" />
-</div>
+# Kokoro TTS Application
 
-# Run and deploy your AI Studio app
+This is a local, in-memory Text-to-Speech (TTS) application built using a modern full-stack JavaScript stack. It leverages `kokoro-js` to perform local TTS generation using an ONNX model, avoiding external API calls for voice generation.
 
-This contains everything you need to run your app locally.
+## Project Components
 
-View your app in AI Studio: https://ai.studio/apps/386315ca-fd2d-4bcd-920e-22c5cce70466
+- **Frontend (React)**: A single-page application built with React and Vite. It handles the UI for text input, audio playback, and admin settings (like custom voice training). It uses Server-Sent Events (SSE) for receiving live audio chunks.
+- **Backend (Express)**: A Node.js web server handling API endpoints and serving static frontend assets.
+- **Kokoro TTS Model (`kokoro-js`)**: The core TTS engine running inside the Node.js process using ONNX runtime.
+- **Persistent Storage**: Uses the local file system to store voice models (custom voice samples) and temporary audio chunks.
+- **Database (SQLite)**: Maintains metadata for trained voices in a local `.db` file.
 
-## Run Locally
+*Note: For detailed information, including user flow and component diagrams, please refer to the [architecture.md](architecture.md).*
 
-**Prerequisites:**  Node.js
+## Deployment & Installation
 
+A `Dockerfile` is available for containerized deployment.
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+For comprehensive instructions on how to install, run natively, or deploy using Docker, please refer to the [Installation Guide](install.md).

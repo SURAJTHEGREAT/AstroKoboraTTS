@@ -10,3 +10,7 @@ coverage/
 # Data directory
 /data/
 *.db
+
+# Test reports
+tests/reports/
+html/

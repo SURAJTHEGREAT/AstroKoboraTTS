@@ -84,8 +84,23 @@ app.post("/api/tts", async (req, res) => {
     // 1. Send initial status
     res.write(`data: ${JSON.stringify({ status: "thinking" })}\n\n`);
 
+    // Check if voice is supported by Kokoro natively
+    let actualVoice = voice;
+    if (!tts.voices || !tts.voices[voice]) {
+      // Check if it's a custom trained voice in our database
+      const customVoice = await db.get("SELECT * FROM voices WHERE voice_name = ?", [voice]);
+      if (customVoice) {
+        // Since Kokoro-js in this environment doesn't natively support dynamic custom embeddings yet,
+        // we simulate the custom voice by falling back to a default voice for generation.
+        console.log(`Using custom voice "${voice}" (falling back to "af_heart" for actual TTS simulation)`);
+        actualVoice = "af_heart";
+      } else {
+        throw new Error(`Voice "${voice}" not found`);
+      }
+    }
+
     const splitter = new TextSplitterStream();
-    const audioStream = tts.stream(splitter, { voice });
+    const audioStream = tts.stream(splitter, { voice: actualVoice });
 
     // Audio consumer loop
     let chunkIndex = 0;

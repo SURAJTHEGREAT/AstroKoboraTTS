@@ -17,3 +17,16 @@ This is a local, in-memory Text-to-Speech (TTS) application built using a modern
 A `Dockerfile` is available for containerized deployment.
 
 For comprehensive instructions on how to install, run natively, or deploy using Docker, please refer to the [Installation Guide](install.md).
+
+## Testing
+
+Automated tests are written for both the frontend and backend using a suite of tools:
+- **Vitest**: The core test runner.
+- **@testing-library/react**: For testing React components.
+- **supertest**: For testing backend Express API endpoints.
+
+To execute the test suite, run the following command in the project root:
+
+```bash
+npm run test
+```

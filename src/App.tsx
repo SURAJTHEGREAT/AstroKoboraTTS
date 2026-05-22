@@ -1,6 +1,7 @@
 import { Routes, Route, Link } from "react-router";
 import Chat from "./components/Chat";
 import Training from "./components/Training";
+import ApiClients from "./components/ApiClients";
 
 export default function App() {
   return (
@@ -15,6 +16,9 @@ export default function App() {
             <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
             <span className="text-[10px] uppercase font-bold text-green-700 tracking-wider">CPU Engine Active</span>
           </div>
+          <Link to="/clients" className="px-5 py-2 bg-slate-600 hover:bg-slate-700 text-white text-xs font-bold uppercase tracking-widest rounded transition-all shadow-sm">
+            API Clients
+          </Link>
           <Link to="/train" className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold uppercase tracking-widest rounded transition-all shadow-sm">
             Train Voice
           </Link>
@@ -24,6 +28,7 @@ export default function App() {
         <Routes>
           <Route path="/" element={<Chat />} />
           <Route path="/train" element={<Training />} />
+          <Route path="/clients" element={<ApiClients />} />
         </Routes>
       </main>
     </div>

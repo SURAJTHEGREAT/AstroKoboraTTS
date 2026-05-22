@@ -1,20 +1,22 @@
 # TTS Integration Test Report
 
-*Generated on: 5/22/2026, 5:11:59 AM*
+*Generated on: 5/22/2026, 7:26:54 AM*
 
 ## Test Summary
 
 | Test Suite | Status | Duration (ms) |
 |---|---|---|
-| `/tests/BackendAPI.test.ts` | ✅ Pass | 14889.21826171875 |
-| `/tests/Chat.test.tsx` | ✅ Pass | 112.794189453125 |
-| `/tests/Server.test.ts` | ✅ Pass | 17037.89013671875 |
+| `/tests/BackendAPI.test.ts` | ✅ Pass | 15306.880126953125 |
+| `/tests/Chat.test.tsx` | ✅ Pass | 114.667724609375 |
+| `/tests/Server.test.ts` | ✅ Pass | 16554.082763671875 |
 
 ## Detailed Results
 
 ### `/tests/BackendAPI.test.ts`
 
 - ✅ **POST /api/train should train a custom voice sample successfully**
+- ✅ **POST /api/analytics should fail with invalid credentials**
+- ✅ **POST /api/analytics should return analytics data with valid credentials**
 - ✅ **POST /api/clients should fail with invalid credentials**
 - ✅ **API_ONLY mode authentication flow**
 - ✅ **POST /api/train should fail with invalid credentials**

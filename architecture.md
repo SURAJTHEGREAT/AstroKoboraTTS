@@ -40,10 +40,22 @@ sequenceDiagram
     Express->>Kokoro: Load Model (if not loaded) & Stream Text
     Kokoro-->>Express: Yield Audio Chunks & Phonemes
     Express->>FS: Save chunk to temp folder (.wav)
+    Express->>SQLite: Record stats (api_client_stats) if authenticated
     Express-->>Frontend: SSE: audioUrl (/api/audio/chunk.wav)
     Frontend->>Express: GET /api/audio/chunk.wav
     Express-->>Frontend: Returns audio file
     Frontend->>User: Play Audio
+    end
+
+    %% Analytics Flow
+    rect rgb(240, 255, 240)
+    Note over User, SQLite: Admin Analytics
+    User->>Frontend: Open Analytics Page (Login Admin)
+    Frontend->>Express: POST /api/analytics
+    Express->>SQLite: Query total words & avg time
+    SQLite-->>Express: Returns aggregated stats
+    Express-->>Frontend: JSON data
+    Frontend->>User: Display Charts (Recharts)
     end
 
     %% Voice Training Flow

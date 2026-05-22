@@ -32,7 +32,7 @@ Once connected to the database, you can list all the available tables by running
 sqlite> .tables
 ```
 
-This should output `voices`, which is the main table used in this application.
+This should output `voices`, `api_clients`, and `api_client_stats`.
 
 ## Running SELECT Queries
 
@@ -45,6 +45,27 @@ sqlite> SELECT * FROM voices;
 ```
 
 This will display all columns for every row in the `voices` table.
+
+### View API Clients
+
+```sqlite
+sqlite> SELECT * FROM api_clients;
+```
+
+### View Client Analytics Data
+
+```sqlite
+sqlite> SELECT * FROM api_client_stats;
+```
+
+### View aggregated stats per client
+
+```sqlite
+sqlite> SELECT c.client_name, SUM(s.words_processed) AS total_words, CAST(AVG(s.time_taken_ms) AS INTEGER) AS avg_time_ms
+   ...> FROM api_clients c
+   ...> LEFT JOIN api_client_stats s ON c.client_id = s.client_id
+   ...> GROUP BY c.client_id;
+```
 
 ### View specific columns
 

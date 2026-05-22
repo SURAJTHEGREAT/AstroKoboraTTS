@@ -96,3 +96,34 @@ data: {"status":"done"}
 ```
 
 You can then download the generated audio chunk by navigating to `http://localhost:3000/api/audio/chunk-1718884930-0.wav` (the URL provided in the `audioUrl` field).
+
+### 3. Fetching Analytics Data
+
+The `/api/analytics` endpoint provides access to TTS usage statistics (words processed, average time taken) aggregated by API client.
+
+**Endpoint:** `POST /api/analytics`
+**Content-Type:** `application/json`
+
+**Parameters (JSON Body):**
+- `username` (string): Admin username (default: `admin`)
+- `password` (string): Admin password (default: `password`)
+
+#### Example using `curl`:
+
+```bash
+curl -X POST http://localhost:3000/api/analytics \
+  -H "Content-Type: application/json" \
+  -d '{"username": "admin", "password": "password"}'
+```
+
+**Expected Response:**
+
+```json
+[
+  {
+    "client_name": "Test Client",
+    "total_words_processed": 1500,
+    "avg_time_taken_ms": 2540
+  }
+]
+```

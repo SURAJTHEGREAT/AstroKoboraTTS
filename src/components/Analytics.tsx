@@ -3,8 +3,9 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Responsive
 
 interface AnalyticsData {
   client_name: string;
+  total_files_generated: number;
   total_words_processed: number;
-  avg_time_taken_ms: number;
+  avg_ttfb_ms: number;
 }
 
 export default function Analytics() {
@@ -111,6 +112,20 @@ export default function Analytics() {
         ) : (
           <div className="space-y-8">
             <div className="w-full h-80">
+              <h3 className="text-lg font-medium text-slate-700 mb-4 text-center">Total Audio Files Generated</h3>
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={data} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="client_name" />
+                  <YAxis />
+                  <Tooltip />
+                  <Legend />
+                  <Bar dataKey="total_files_generated" name="Total Files Generated" fill="#f59e0b" />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+
+            <div className="w-full h-80">
               <h3 className="text-lg font-medium text-slate-700 mb-4 text-center">Number of Words Processed</h3>
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={data} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
@@ -125,7 +140,7 @@ export default function Analytics() {
             </div>
 
             <div className="w-full h-80">
-              <h3 className="text-lg font-medium text-slate-700 mb-4 text-center">Average TTS Time Taken (ms)</h3>
+              <h3 className="text-lg font-medium text-slate-700 mb-4 text-center">Average Time to First Byte (ms)</h3>
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={data} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
                   <CartesianGrid strokeDasharray="3 3" />
@@ -133,7 +148,7 @@ export default function Analytics() {
                   <YAxis />
                   <Tooltip />
                   <Legend />
-                  <Bar dataKey="avg_time_taken_ms" name="Average Time (ms)" fill="#10b981" />
+                  <Bar dataKey="avg_ttfb_ms" name="Average TTFB (ms)" fill="#10b981" />
                 </BarChart>
               </ResponsiveContainer>
             </div>

@@ -61,7 +61,7 @@ sqlite> SELECT * FROM api_client_stats;
 ### View aggregated stats per client
 
 ```sqlite
-sqlite> SELECT c.client_name, SUM(s.words_processed) AS total_words, CAST(AVG(s.time_taken_ms) AS INTEGER) AS avg_time_ms
+sqlite> SELECT c.client_name, COUNT(s.id) AS total_files, SUM(s.words_processed) AS total_words, CAST(AVG(s.ttfb_ms) AS INTEGER) AS avg_ttfb_ms
    ...> FROM api_clients c
    ...> LEFT JOIN api_client_stats s ON c.client_id = s.client_id
    ...> GROUP BY c.client_id;

@@ -1,14 +1,14 @@
 # TTS Integration Test Report
 
-*Generated on: 5/22/2026, 7:26:54 AM*
+*Generated on: 5/22/2026, 10:15:48 AM*
 
 ## Test Summary
 
 | Test Suite | Status | Duration (ms) |
 |---|---|---|
-| `/tests/BackendAPI.test.ts` | ✅ Pass | 15306.880126953125 |
-| `/tests/Chat.test.tsx` | ✅ Pass | 114.667724609375 |
-| `/tests/Server.test.ts` | ✅ Pass | 16554.082763671875 |
+| `/tests/BackendAPI.test.ts` | ✅ Pass | 12867.753662109375 |
+| `/tests/Chat.test.tsx` | ✅ Pass | 90.17529296875 |
+| `/tests/Server.test.ts` | ✅ Pass | 14865.482177734375 |
 
 ## Detailed Results
 

@@ -45,7 +45,7 @@ async function initDb() {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       client_id TEXT NOT NULL,
       words_processed INTEGER NOT NULL,
-      time_taken_ms INTEGER NOT NULL,
+      ttfb_ms INTEGER NOT NULL,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (client_id) REFERENCES api_clients(client_id)
     );
@@ -155,8 +155,13 @@ app.post("/api/tts", apiAuthMiddleware, async (req, res) => {
 
     // Audio consumer loop
     let chunkIndex = 0;
+    let ttfbMs = 0;
     const processAudio = async () => {
       for await (const { text, phonemes, audio } of audioStream) {
+        if (chunkIndex === 0) {
+          ttfbMs = Date.now() - startTime;
+        }
+
         console.log(`[Chunk ${chunkIndex}] Processing text: "${text}"`);
         const filename = `chunk-${Date.now()}-${chunkIndex++}.wav`;
         const filepath = path.join(tempDir, filename);
@@ -185,14 +190,12 @@ app.post("/api/tts", apiAuthMiddleware, async (req, res) => {
     // Wait for audio generation to finish
     await processAudioPromise;
 
-    const timeTakenMs = Date.now() - startTime;
-
     // Track stats if this is an authenticated API client
     const apiClient = (req as any).apiClient;
     if (apiClient) {
       await db.run(
-        `INSERT INTO api_client_stats (client_id, words_processed, time_taken_ms) VALUES (?, ?, ?)`,
-        [apiClient.client_id, wordsProcessed, timeTakenMs]
+        `INSERT INTO api_client_stats (client_id, words_processed, ttfb_ms) VALUES (?, ?, ?)`,
+        [apiClient.client_id, wordsProcessed, ttfbMs]
       );
     }
 
@@ -292,8 +295,9 @@ app.post("/api/analytics", async (req, res) => {
     const stats = await db.all(`
       SELECT
         c.client_name,
+        COUNT(s.id) as total_files_generated,
         SUM(s.words_processed) as total_words_processed,
-        CAST(AVG(s.time_taken_ms) AS INTEGER) as avg_time_taken_ms
+        CAST(AVG(s.ttfb_ms) AS INTEGER) as avg_ttfb_ms
       FROM api_clients c
       LEFT JOIN api_client_stats s ON c.client_id = s.client_id
       GROUP BY c.client_id, c.client_name
@@ -302,8 +306,9 @@ app.post("/api/analytics", async (req, res) => {
     // Replace nulls with 0s for clients with no stats yet
     const sanitizedStats = stats.map((stat: any) => ({
       client_name: stat.client_name,
+      total_files_generated: stat.total_files_generated || 0,
       total_words_processed: stat.total_words_processed || 0,
-      avg_time_taken_ms: stat.avg_time_taken_ms || 0
+      avg_ttfb_ms: stat.avg_ttfb_ms || 0
     }));
 
     res.json(sanitizedStats);

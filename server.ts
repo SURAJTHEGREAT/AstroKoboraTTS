@@ -7,6 +7,7 @@ import { KokoroTTS, TextSplitterStream } from "kokoro-js";
 import multer from "multer";
 import sqlite3 from "sqlite3";
 import { open } from "sqlite";
+import crypto from "crypto";
 
 const app = express();
 const PORT = 3000;
@@ -32,7 +33,14 @@ async function initDb() {
       file_path TEXT NOT NULL,
       original_filename TEXT NOT NULL,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    )
+    );
+    CREATE TABLE IF NOT EXISTS api_clients (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      client_name TEXT NOT NULL,
+      client_id TEXT NOT NULL UNIQUE,
+      client_secret TEXT NOT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
   `);
 }
 initDb().catch(console.error);
@@ -67,7 +75,39 @@ app.get("/api/audio/:filename", (req, res) => {
 // Multer setup for voice embedding upload
 const upload = multer({ dest: path.join(os.tmpdir(), "kokoro_uploads") });
 
-app.post("/api/tts", async (req, res) => {
+// Middleware for API client authentication
+const apiAuthMiddleware = async (req: express.Request, res: express.Response, next: express.NextFunction) => {
+  if (process.env.API_ONLY !== "true") {
+    return next();
+  }
+
+  const clientId = req.headers["x-client-id"];
+  const clientSecret = req.headers["x-client-secret"];
+
+  if (!clientId || !clientSecret) {
+    return res.status(401).json({ error: "Missing x-client-id or x-client-secret headers" });
+  }
+
+  try {
+    const client = await db.get(
+      "SELECT * FROM api_clients WHERE client_id = ? AND client_secret = ?",
+      [clientId, clientSecret]
+    );
+
+    if (!client) {
+      return res.status(401).json({ error: "Invalid client credentials" });
+    }
+
+    // Attach client info to request for potential logging/usage later
+    (req as any).apiClient = client;
+    next();
+  } catch (err: any) {
+    console.error("Auth middleware error:", err);
+    res.status(500).json({ error: "Internal server error during authentication" });
+  }
+};
+
+app.post("/api/tts", apiAuthMiddleware, async (req, res) => {
   const { message, voice = "af_heart" } = req.body;
   if (!message) {
     return res.status(400).json({ error: "Message is required" });
@@ -183,8 +223,44 @@ app.post("/api/train", upload.single("sample"), async (req, res) => {
   }
 });
 
+// Admin route to create a new API client
+app.post("/api/clients", async (req, res) => {
+  const { username, password, clientName } = req.body;
+
+  if (username !== "admin" || password !== "password") {
+    return res.status(401).json({ error: "Invalid credentials" });
+  }
+
+  if (!clientName) {
+    return res.status(400).json({ error: "Client name is required" });
+  }
+
+  try {
+    const clientId = "client_" + crypto.randomBytes(16).toString("hex");
+    const clientSecret = "secret_" + crypto.randomBytes(32).toString("hex");
+
+    await db.run(
+      `INSERT INTO api_clients (client_name, client_id, client_secret) VALUES (?, ?, ?)`,
+      [clientName, clientId, clientSecret]
+    );
+
+    res.json({
+      success: true,
+      message: "API Client generated successfully",
+      client: {
+        client_name: clientName,
+        client_id: clientId,
+        client_secret: clientSecret
+      }
+    });
+  } catch (err: any) {
+    console.error("Error creating API client:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Route to get list of trained models
-app.get("/api/voices", async (req, res) => {
+app.get("/api/voices", apiAuthMiddleware, async (req, res) => {
   try {
     const voices = await db.all("SELECT * FROM voices ORDER BY created_at DESC");
     res.json(voices);

@@ -12,6 +12,10 @@ This is a local, in-memory Text-to-Speech (TTS) application built using a modern
 
 *Note: For detailed information, including user flow and component diagrams, please refer to the [architecture.md](architecture.md).*
 
+## Database Interaction
+
+To interact with the SQLite database directly, list tables, and run queries, please see the [Database Interaction Guide](db-interact.md).
+
 ## Deployment & Installation
 
 A `Dockerfile` is available for containerized deployment.

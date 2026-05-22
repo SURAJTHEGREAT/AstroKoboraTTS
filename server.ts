@@ -41,6 +41,14 @@ async function initDb() {
       client_secret TEXT NOT NULL,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
+    CREATE TABLE IF NOT EXISTS api_client_stats (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      client_id TEXT NOT NULL,
+      words_processed INTEGER NOT NULL,
+      time_taken_ms INTEGER NOT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (client_id) REFERENCES api_clients(client_id)
+    );
   `);
 }
 initDb().catch(console.error);
@@ -114,6 +122,9 @@ app.post("/api/tts", apiAuthMiddleware, async (req, res) => {
   }
 
   try {
+    const startTime = Date.now();
+    const wordsProcessed = message.trim().split(/\s+/).length;
+
     // Setup SSE
     res.setHeader("Content-Type", "text/event-stream");
     res.setHeader("Cache-Control", "no-cache");
@@ -173,6 +184,17 @@ app.post("/api/tts", apiAuthMiddleware, async (req, res) => {
 
     // Wait for audio generation to finish
     await processAudioPromise;
+
+    const timeTakenMs = Date.now() - startTime;
+
+    // Track stats if this is an authenticated API client
+    const apiClient = (req as any).apiClient;
+    if (apiClient) {
+      await db.run(
+        `INSERT INTO api_client_stats (client_id, words_processed, time_taken_ms) VALUES (?, ?, ?)`,
+        [apiClient.client_id, wordsProcessed, timeTakenMs]
+      );
+    }
 
     res.write(`data: ${JSON.stringify({ status: "done" })}\n\n`);
     res.end();
@@ -255,6 +277,38 @@ app.post("/api/clients", async (req, res) => {
     });
   } catch (err: any) {
     console.error("Error creating API client:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Analytics route to get API client statistics
+app.post("/api/analytics", async (req, res) => {
+  const { username, password } = req.body;
+  if (username !== "admin" || password !== "password") {
+    return res.status(401).json({ error: "Invalid credentials" });
+  }
+
+  try {
+    const stats = await db.all(`
+      SELECT
+        c.client_name,
+        SUM(s.words_processed) as total_words_processed,
+        CAST(AVG(s.time_taken_ms) AS INTEGER) as avg_time_taken_ms
+      FROM api_clients c
+      LEFT JOIN api_client_stats s ON c.client_id = s.client_id
+      GROUP BY c.client_id, c.client_name
+    `);
+
+    // Replace nulls with 0s for clients with no stats yet
+    const sanitizedStats = stats.map((stat: any) => ({
+      client_name: stat.client_name,
+      total_words_processed: stat.total_words_processed || 0,
+      avg_time_taken_ms: stat.avg_time_taken_ms || 0
+    }));
+
+    res.json(sanitizedStats);
+  } catch (err: any) {
+    console.error("Error fetching analytics:", err);
     res.status(500).json({ error: err.message });
   }
 });

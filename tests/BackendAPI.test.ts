@@ -29,6 +29,24 @@ describe('Backend API Mode Tests', () => {
     expect(response.body).toHaveProperty('voiceName', 'test_custom_voice');
   });
 
+  it('POST /api/analytics should fail with invalid credentials', async () => {
+    const response = await request(app)
+      .post('/api/analytics')
+      .send({ username: 'admin', password: 'wrongpassword' });
+
+    expect(response.status).toBe(401);
+    expect(response.body).toHaveProperty('error', 'Invalid credentials');
+  });
+
+  it('POST /api/analytics should return analytics data with valid credentials', async () => {
+    const response = await request(app)
+      .post('/api/analytics')
+      .send({ username: 'admin', password: 'password' });
+
+    expect(response.status).toBe(200);
+    expect(Array.isArray(response.body)).toBe(true);
+  });
+
   it('POST /api/clients should fail with invalid credentials', async () => {
     const response = await request(app)
       .post('/api/clients')

@@ -8,7 +8,8 @@ This is a local, in-memory Text-to-Speech (TTS) application built using a modern
 - **Backend (Express)**: A Node.js web server handling API endpoints and serving static frontend assets.
 - **Kokoro TTS Model (`kokoro-js`)**: The core TTS engine running inside the Node.js process using ONNX runtime.
 - **Persistent Storage**: Uses the local file system to store voice models (custom voice samples) and temporary audio chunks.
-- **Database (SQLite)**: Maintains metadata for trained voices in a local `.db` file.
+- **Database (SQLite)**: Maintains metadata for trained voices, API clients, and performance analytics in a local `.db` file.
+- **Analytics Module**: An admin interface utilizing Recharts to monitor and chart TTS generation metrics (e.g., words processed, average execution time) grouped by API client.
 
 *Note: For detailed information, including user flow and component diagrams, please refer to the [architecture.md](architecture.md).*
 

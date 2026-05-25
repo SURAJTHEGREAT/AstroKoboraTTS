@@ -13,6 +13,25 @@ This is a local, in-memory Text-to-Speech (TTS) application built using a modern
 
 *Note: For detailed information, including user flow and component diagrams, please refer to the [architecture.md](architecture.md).*
 
+## Wiki / Documentation
+
+We maintain a detailed technical wiki structured from first principles to help you understand the architecture, data management, and interfaces of Kokoro TTS.
+
+- **[1. Overview](wiki/1-overview.md)**
+- **[2. Core Architecture](wiki/2-core-architecture.md)**
+  - [2.1 Application Interface](wiki/2.1-application-interface.md)
+  - [2.2 Model Execution](wiki/2.2-model-execution.md)
+- **[3. User Interfaces](wiki/3-user-interfaces.md)**
+  - [3.1 Web Interface](wiki/3.1-web-interface.md)
+  - [3.2 Command Line Tools](wiki/3.2-command-line-tools.md)
+- **[4. Speech Processing](wiki/4-speech-processing.md)**
+  - [4.1 Voice Training](wiki/4.1-voice-training.md)
+- **[5. Data Management](wiki/5-data-management.md)**
+  - [5.1 Analytics and Metrics](wiki/5.1-analytics-and-metrics.md)
+- **[6. Development Guide](wiki/6-development-guide.md)**
+  - [6.1 Deployment and Setup](wiki/6.1-deployment-and-setup.md)
+  - [6.2 Backend API Only](wiki/6.2-backend-api.md)
+
 ## Database Interaction
 
 To interact with the SQLite database directly, list tables, and run queries, please see the [Database Interaction Guide](db-interact.md).

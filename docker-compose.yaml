@@ -1,14 +1,27 @@
 version: '3.8'
 
 services:
-  app:
-    build: .
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.frontend
     ports:
       - "3000:3000"
     volumes:
+      - ./frontend/src:/app/src
+    environment:
+      - NODE_ENV=development
+      - BACKEND_URL=http://backend:8000
+    depends_on:
+      - backend
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.backend
+    ports:
+      - "8000:8000"
+    volumes:
       - ./data:/app/data
-      # Mount src to allow hot-reloading if Vite/nodemon is configured for it
-      - ./src:/app/src
-      - ./server.ts:/app/server.ts
     environment:
       - NODE_ENV=development

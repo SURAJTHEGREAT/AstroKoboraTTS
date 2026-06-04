@@ -1,10 +1,10 @@
 import React from 'react';
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router';
 import Chat from '../src/components/Chat';
 
 describe('Chat Component', () => {
-  it('renders chat interface correctly', () => {
+  it('renders chat interface correctly', async () => {
     render(
       <MemoryRouter>
         <Chat />
@@ -23,5 +23,10 @@ describe('Chat Component', () => {
     // Verify other options exist
     expect(screen.getByText('Adam (Male)')).toBeInTheDocument();
     expect(screen.getByText('Emma (Female)')).toBeInTheDocument();
+
+    // Wait for the async state updates from mount-time voice fetching to settle
+    await waitFor(() => {
+      expect(voiceSelect).toBeInTheDocument();
+    });
   });
 });

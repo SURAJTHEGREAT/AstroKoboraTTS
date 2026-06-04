@@ -1,24 +1,20 @@
-# Backend API Only Mode
+# Backend API
 
-You can run the Kokoro TTS application backend purely as an API server, bypassing the frontend completely. This is useful if you want to integrate the Kokoro TTS service into your own applications or run it headlessly.
+The Kokoro TTS backend functions as an API server using FastAPI. This is useful if you want to integrate the Kokoro TTS service into your own applications or run it headlessly.
 
-## Running in API-Only Mode
+## Running the Backend
 
-To run the application in API-only mode, you need to set the `API_ONLY` environment variable to `true` when starting the server.
-
-```bash
-# Using npm
-API_ONLY=true npm run dev
-```
-
-Alternatively, if you're executing `tsx` directly:
+You can run the application directly with Uvicorn:
 
 ```bash
-API_ONLY=true npx tsx server.ts
+cd backend
+pip install -r requirements.txt
+uvicorn main:app --reload --port 8000
 ```
 
-The console will indicate that it is running in API Only Mode:
-`Server running on http://localhost:3000 (API Only Mode)`
+The console will indicate that it is running on `http://localhost:8000`
+
+If you start the backend with `API_ONLY=true`, then `x-client-id` and `x-client-secret` headers will be required on the `/api/tts` endpoint.
 
 ## Core API Endpoints
 
@@ -42,7 +38,7 @@ The `/api/train` endpoint accepts a single `.wav` file as a sample. It creates v
 echo "dummy audio content" > sample_voice.wav
 
 # Upload the sample voice to create a new embedding named "my_custom_voice"
-curl -X POST http://localhost:3000/api/train \
+curl -X POST http://localhost:8000/api/train \
   -H "Accept: application/json" \
   -F "username=admin" \
   -F "password=password" \
@@ -76,7 +72,7 @@ The `/api/tts` endpoint receives text and streams back chunks of generated audio
 Using the newly created `my_custom_voice` embedding:
 
 ```bash
-curl -N -X POST http://localhost:3000/api/tts \
+curl -N -X POST http://localhost:8000/api/tts \
   -H "Content-Type: application/json" \
   -d '{"message": "Hello, this is a test using my new custom voice.", "voice": "my_custom_voice"}'
 ```
@@ -95,7 +91,7 @@ data: {"status":"audio","text":"Hello, ","audioUrl":"/api/audio/chunk-1718884930
 data: {"status":"done"}
 ```
 
-You can then download the generated audio chunk by navigating to `http://localhost:3000/api/audio/chunk-1718884930-0.wav` (the URL provided in the `audioUrl` field).
+You can then download the generated audio chunk by navigating to `http://localhost:8000/api/audio/chunk-1718884930-0.wav` (the URL provided in the `audioUrl` field).
 
 ### 3. Fetching Analytics Data
 
@@ -111,7 +107,7 @@ The `/api/analytics` endpoint provides access to TTS usage statistics (words pro
 #### Example using `curl`:
 
 ```bash
-curl -X POST http://localhost:3000/api/analytics \
+curl -X POST http://localhost:8000/api/analytics \
   -H "Content-Type: application/json" \
   -d '{"username": "admin", "password": "password"}'
 ```

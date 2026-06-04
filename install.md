@@ -1,6 +1,6 @@
 # Installation and Running Guide
 
-This guide provides instructions on how to install and run the Kokoro TTS application on a WSL/Linux environment. You can choose to run it natively using Node.js or in a containerized environment using Docker.
+This guide provides instructions on how to install and run the Kokoro TTS application on a WSL/Linux environment. You can choose to run it natively or in a containerized environment using Docker.
 
 ## Prerequisites
 
@@ -18,7 +18,7 @@ Regardless of the method you choose, ensure you have the following installed on 
 
 ---
 
-## Option 1: Native Execution (Node.js)
+## Option 1: Native Execution
 
 1. **Clone the Repository**
    Navigate to your desired workspace and clone the repository.
@@ -27,21 +27,25 @@ Regardless of the method you choose, ensure you have the following installed on 
    cd <repository_directory>
    ```
 
-2. **Install Dependencies**
-   Run the following command to install the required Node.js packages:
-   ```bash
-   npm install
-   ```
-
-3. **Initialize Persistent Storage**
-   The application uses a local directory to store databases and models. Ensure the data directory exists (the app will attempt to create it, but it's good practice):
+2. **Initialize Persistent Storage**
+   The application uses a local directory to store databases and models.
    ```bash
    mkdir -p data/models
    ```
 
-4. **Run the Application**
-   Start the application in development mode:
+3. **Run the Backend (FastAPI)**
    ```bash
+   cd backend
+   pip install -r requirements.txt
+   # Download the ONNX models into data/models
+   uvicorn main:app --reload --port 8000
+   ```
+
+4. **Run the Frontend (React/Vite)**
+   In a new terminal:
+   ```bash
+   cd frontend
+   npm install
    npm run dev
    ```
 
@@ -52,36 +56,8 @@ Regardless of the method you choose, ensure you have the following installed on 
 
 ## Option 2: Docker Execution
 
-Using Docker avoids having to install Node.js natively and ensures a consistent environment.
+Please refer to the [Docker Build Instructions](docker-build.md) for detailed steps on using Docker Compose.
 
-1. **Clone the Repository**
-   Navigate to your desired workspace and clone the repository.
-   ```bash
-   git clone <repository_url>
-   cd <repository_directory>
-   ```
-
-2. **Initialize Persistent Storage Directory**
-   Docker needs the local directory to mount it as a volume for the database and trained models.
-   ```bash
-   mkdir -p data/models
-   ```
-
-3. **Build and Run the Containers**
-   Use Docker Compose to build the image and start the container:
-   ```bash
-   docker-compose up --build
-   ```
-   *Note: If you run it in detached mode, append `-d` to the command (`docker-compose up -d --build`).*
-
-4. **Access the Application**
-   The application will be exposed on port `3000`. Open your browser and navigate to `http://localhost:3000`.
-
-5. **Stopping the Application**
-   If running in the foreground, simply press `Ctrl+C`. If running in detached mode, execute:
-   ```bash
-   docker-compose down
-   ```
 
 ## Troubleshooting
 

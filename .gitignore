@@ -13,3 +13,4 @@ coverage/
 
 # Test reports
 html/
+__pycache__/

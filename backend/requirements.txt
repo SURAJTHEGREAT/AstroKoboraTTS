@@ -1,0 +1,10 @@
+fastapi[standard]
+uvicorn
+kokoro-onnx
+soundfile
+sqlalchemy
+aiosqlite
+python-multipart
+pytest
+httpx
+pytest-asyncio

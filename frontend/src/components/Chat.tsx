@@ -36,6 +36,7 @@ export default function Chat() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [currentResponse, setCurrentResponse] = useState("");
   const [selectedVoice, setSelectedVoice] = useState("af_heart");
+  const [customVoices, setCustomVoices] = useState<any[]>([]);
   
   // Audio playback queue
   const audioQueue = useRef<string[]>([]);
@@ -43,6 +44,19 @@ export default function Chat() {
   const audioContext = useRef<AudioContext | null>(null);
 
   useEffect(() => {
+    const fetchCustomVoices = async () => {
+      try {
+        const response = await fetch("/api/voices");
+        if (response.ok) {
+          const data = await response.json();
+          setCustomVoices(data);
+        }
+      } catch (err) {
+        console.error("Failed to fetch custom voices", err);
+      }
+    };
+    fetchCustomVoices();
+
     return () => {
       if (audioContext.current) {
         audioContext.current.close().catch(console.error);
@@ -166,7 +180,15 @@ export default function Chat() {
     }
   };
 
-  const currentVoiceObj = AVAILABLE_VOICES.find(v => v.id === selectedVoice);
+  const currentVoiceObj = 
+    AVAILABLE_VOICES.find(v => v.id === selectedVoice) || 
+    (customVoices.find(v => v.voice_name === selectedVoice) ? {
+      id: selectedVoice,
+      name: customVoices.find(v => v.voice_name === selectedVoice).voice_name,
+      gender: "Custom",
+      region: "Local",
+      desc: "Custom trained voice embedding"
+    } : undefined);
 
   return (
     <div className="flex-1 flex flex-col bg-slate-50 h-full overflow-hidden">
@@ -179,11 +201,13 @@ export default function Chat() {
           <div>
             <div className="text-[10px] uppercase font-bold tracking-widest text-slate-500">Active Speaker Profile</div>
             <div className="text-sm font-semibold text-slate-800 flex items-center gap-2">
-              {currentVoiceObj?.name} ({currentVoiceObj?.region === "US" ? "American" : "British"})
+              {currentVoiceObj?.name} ({currentVoiceObj?.region === "US" ? "American" : currentVoiceObj?.region === "UK" ? "British" : "Local"})
               <span className={`px-2 py-0.5 text-[9px] rounded font-bold uppercase ${
                 currentVoiceObj?.gender === "Female" 
                   ? "bg-pink-50 border border-pink-100 text-pink-600" 
-                  : "bg-indigo-50 border border-indigo-100 text-indigo-600"
+                  : currentVoiceObj?.gender === "Male"
+                    ? "bg-indigo-50 border border-indigo-100 text-indigo-600"
+                    : "bg-emerald-50 border border-emerald-100 text-emerald-600"
               }`}>
                 {currentVoiceObj?.gender}
               </span>
@@ -219,6 +243,15 @@ export default function Chat() {
                 </option>
               ))}
             </optgroup>
+            {customVoices.length > 0 && (
+              <optgroup label="🎙️ Trained/Custom Voices">
+                {customVoices.map(v => (
+                  <option key={v.id} value={v.voice_name}>
+                    {v.voice_name} (Custom)
+                  </option>
+                ))}
+              </optgroup>
+            )}
           </select>
         </div>
       </div>
@@ -242,7 +275,11 @@ export default function Chat() {
                 <p className="text-sm leading-relaxed text-slate-800">{msg.content}</p>
                 {msg.role === "assistant" && msg.voice && (
                   <div className="mt-2.5 pt-2 border-t border-indigo-100 flex items-center gap-1.5 text-[10px] font-medium text-indigo-600 font-mono uppercase tracking-wider opacity-85">
-                    <Sparkles size={11} className="text-indigo-500/80" /> Voice Profile: {AVAILABLE_VOICES.find(v => v.id === msg.voice)?.name || msg.voice}
+                    <Sparkles size={11} className="text-indigo-500/80" /> Voice Profile: {
+                      AVAILABLE_VOICES.find(v => v.id === msg.voice)?.name || 
+                      customVoices.find(v => v.voice_name === msg.voice)?.voice_name || 
+                      msg.voice
+                    }
                   </div>
                 )}
               </div>

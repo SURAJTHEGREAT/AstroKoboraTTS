@@ -8,6 +8,7 @@ export default function Training() {
   const [loginError, setLoginError] = useState("");
   
   const [file, setFile] = useState<File | null>(null);
+  const [voiceName, setVoiceName] = useState("");
   const [isUploading, setIsUploading] = useState(false);
   const [uploadStatus, setUploadStatus] = useState<"idle" | "success" | "error">("idle");
   const [uploadMessage, setUploadMessage] = useState("");
@@ -48,6 +49,9 @@ export default function Training() {
     formData.append("sample", file);
     formData.append("username", username);
     formData.append("password", password);
+    if (voiceName.trim()) {
+      formData.append("voiceName", voiceName.trim());
+    }
 
     try {
       const response = await fetch("/api/train", {
@@ -61,6 +65,7 @@ export default function Training() {
         setUploadStatus("success");
         setUploadMessage(data.message || "Voice embedding generated successfully!");
         setFile(null);
+        setVoiceName("");
         if (fileInputRef.current) fileInputRef.current.value = "";
       } else {
         setUploadStatus("error");
@@ -157,25 +162,42 @@ export default function Training() {
         </div>
 
         {file && (
-          <div className="bg-slate-50 rounded-lg p-4 flex items-center justify-between border border-slate-200 shadow-xs">
-            <div className="flex flex-col">
-              <span className="text-sm font-medium text-slate-700 truncate max-w-[200px] sm:max-w-xs">{file.name}</span>
-              <span className="text-xs text-slate-500 font-mono">{(file.size / 1024 / 1024).toFixed(2)} MB</span>
+          <div className="space-y-4 bg-slate-50 rounded-lg p-5 border border-slate-200 shadow-xs">
+            <div className="flex items-center justify-between">
+              <div className="flex flex-col">
+                <span className="text-sm font-medium text-slate-700 truncate max-w-[200px] sm:max-w-xs">{file.name}</span>
+                <span className="text-xs text-slate-500 font-mono">{(file.size / 1024 / 1024).toFixed(2)} MB</span>
+              </div>
+              <button 
+                onClick={handleUpload}
+                disabled={isUploading}
+                className="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2 rounded text-[10px] uppercase tracking-[0.1em] font-bold transition-colors disabled:opacity-50 flex items-center gap-2 shadow-xs"
+              >
+                {isUploading ? (
+                  <>
+                    <Loader2 size={14} className="animate-spin" />
+                    PROCESSING...
+                  </>
+                ) : (
+                  "TRAIN VOICE"
+                )}
+              </button>
             </div>
-            <button 
-              onClick={handleUpload}
-              disabled={isUploading}
-              className="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2 rounded text-[10px] uppercase tracking-[0.1em] font-bold transition-colors disabled:opacity-50 flex items-center gap-2 shadow-xs"
-            >
-              {isUploading ? (
-                <>
-                  <Loader2 size={14} className="animate-spin" />
-                  PROCESSING...
-                </>
-              ) : (
-                "TRAIN VOICE"
-              )}
-            </button>
+            
+            <div className="pt-3 border-t border-slate-200">
+              <label htmlFor="custom-voice-name" className="block text-[10px] uppercase tracking-[0.15em] font-bold text-slate-500 mb-2">
+                Voice Name (Optional)
+              </label>
+              <input
+                id="custom-voice-name"
+                type="text"
+                value={voiceName}
+                onChange={(e) => setVoiceName(e.target.value)}
+                disabled={isUploading}
+                placeholder="e.g., My Custom Voice"
+                className="w-full bg-white border border-slate-200 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-800 transition-all placeholder:text-slate-400"
+              />
+            </div>
           </div>
         )}
 

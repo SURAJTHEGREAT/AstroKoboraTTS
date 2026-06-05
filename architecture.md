@@ -90,4 +90,4 @@ Kokoro TTS is an efficient text-to-speech model. The specific version used here 
 
 5. **Vocoder**:
    - A vocoder processes the Mel-spectrogram and synthesizes the final raw audio waveform.
-   - The `kokoro-js` library handles the streaming output of this audio, allowing the Express server to pipe `.wav` chunks directly to the user before the entire sentence has finished generating.
+   - The `kokoro-onnx` library handles the streaming output of this audio, allowing the FastAPI server to pipe `.wav` chunks directly to the user before the entire sentence has finished generating.

@@ -1,6 +1,6 @@
 # Kokoro TTS Application
 
-This is a local, in-memory Text-to-Speech (TTS) application built using a modern full-stack JavaScript stack. It leverages `kokoro-js` to perform local TTS generation using an ONNX model, avoiding external API calls for voice generation.
+This is a local, in-memory Text-to-Speech (TTS) application built using a modern React and FastAPI stack. It leverages `kokoro-onnx` to perform local TTS generation using an ONNX model, avoiding external API calls for voice generation.
 
 ## Project Components
 

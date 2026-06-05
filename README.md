@@ -4,10 +4,10 @@ This is a local, in-memory Text-to-Speech (TTS) application built using a modern
 
 ## Project Components
 
-- **Frontend (React)**: A single-page application built with React and Vite. It handles the UI for text input, audio playback, and admin settings (like custom voice training). It uses Server-Sent Events (SSE) for receiving live audio chunks.
+- **Frontend (React)**: A single-page application built with React and Vite. It handles the UI for text input, audio playback, and admin settings (like voice blending). It uses Server-Sent Events (SSE) for receiving live audio chunks.
 - **Backend (FastAPI)**: A Python web server handling API endpoints using FastAPI.
 - **Kokoro TTS Model (`kokoro-onnx`)**: The core TTS engine running inside the Python process using ONNX runtime.
-- **Persistent Storage**: Uses the local file system to store voice models (custom voice samples) and temporary audio chunks.
+- **Persistent Storage**: Uses the local file system to store the base ONNX models and temporary audio chunks.
 - **Database (SQLite)**: Maintains metadata for trained voices, API clients, and performance analytics in a local `.db` file.
 - **Analytics Module**: An admin interface utilizing Recharts to monitor and chart TTS generation metrics (e.g., total audio files generated, words processed, average time to first byte) grouped by API client.
 
@@ -25,7 +25,7 @@ We maintain a detailed technical wiki structured from first principles to help y
   - [3.1 Web Interface](wiki/3.1-web-interface.md)
   - [3.2 Command Line Tools](wiki/3.2-command-line-tools.md)
 - **[4. Speech Processing](wiki/4-speech-processing.md)**
-  - [4.1 Voice Training](wiki/4.1-voice-training.md)
+  - [4.1 Voice Blending](wiki/4.1-voice-blending.md)
 - **[5. Data Management](wiki/5-data-management.md)**
   - [5.1 Analytics and Metrics](wiki/5.1-analytics-and-metrics.md)
 - **[6. Development Guide](wiki/6-development-guide.md)**

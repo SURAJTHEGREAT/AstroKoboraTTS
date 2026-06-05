@@ -111,16 +111,28 @@ async def tts_endpoint(request: Request, body: TTSRequest, db: AsyncSession = De
     words_processed = len(message.split())
 
     # Check if voice exists natively, else simulate fallback
-    actual_voice = body.voice
+    requested_voice = body.voice
+    actual_voice_style = requested_voice
 
-    # In python implementation, kokoro_model natively has voices if it loaded properly.
-    # The list of voices might not be easily accessible, but we can attempt to fetch custom voice
-    result = await db.execute(select(Voice).where(Voice.voice_name == actual_voice))
+    # Check if it's a custom/blended voice in our DB
+    result = await db.execute(select(Voice).where(Voice.voice_name == requested_voice))
     custom_voice = result.scalar_one_or_none()
 
-    if custom_voice:
-        print(f"Using custom voice '{actual_voice}' (falling back to 'af_heart' for actual TTS simulation)")
-        actual_voice = "af_heart"
+    if custom_voice and custom_voice.is_blended:
+        print(f"Blending voices: {custom_voice.voice_a} and {custom_voice.voice_b} with ratio {custom_voice.ratio}")
+        try:
+            # Get styles for both voices
+            style_a = kokoro_model.get_voice_style(custom_voice.voice_a)
+            style_b = kokoro_model.get_voice_style(custom_voice.voice_b)
+            # Blend them: ratio applies to voice_b
+            actual_voice_style = style_a * (1.0 - custom_voice.ratio) + style_b * custom_voice.ratio
+        except Exception as e:
+            print(f"Error blending voices, falling back to default: {e}")
+            actual_voice_style = "af_heart"
+    elif custom_voice:
+        # For non-blended custom voices (legacy or other), fallback
+        print(f"Using custom voice '{requested_voice}' (falling back to 'af_heart' for actual TTS simulation)")
+        actual_voice_style = "af_heart"
 
     async def event_generator():
         start_time = time.time()
@@ -145,7 +157,7 @@ async def tts_endpoint(request: Request, body: TTSRequest, db: AsyncSession = De
                 loop = asyncio.get_event_loop()
                 samples, sample_rate = await loop.run_in_executor(
                     None,
-                    lambda: kokoro_model.create(text_chunk, voice=actual_voice, speed=1.0, lang="en-us")
+                    lambda: kokoro_model.create(text_chunk, voice=actual_voice_style, speed=1.0, lang="en-us")
                 )
 
                 filename = f"chunk-{int(time.time() * 1000)}-{i}.wav"
@@ -199,38 +211,38 @@ async def get_audio(filename: str):
         raise HTTPException(status_code=404, detail="Audio file not found")
     return FileResponse(filepath)
 
-@app.post("/api/train")
-async def train_endpoint(
-    username: str = Form(...),
-    password: str = Form(...),
-    voiceName: Optional[str] = Form(None),
-    sample: UploadFile = File(...),
-    db: AsyncSession = Depends(get_db)
-):
-    if username != "admin" or password != "password":
+class BlendRequest(BaseModel):
+    username: str
+    password: str
+    voiceName: str
+    voiceA: str
+    voiceB: str
+    ratio: float = 0.5
+
+@app.post("/api/blend")
+async def blend_endpoint(body: BlendRequest, db: AsyncSession = Depends(get_db)):
+    if body.username != "admin" or body.password != "password":
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
-    final_voice_name = voiceName if voiceName else f"voice_{int(time.time() * 1000)}"
+    if not body.voiceName:
+        raise HTTPException(status_code=400, detail="Voice name is required")
 
-    print(f"Received sample file for training: {sample.filename}")
-    await asyncio.sleep(2) # Simulate processing time
-
-    ext = os.path.splitext(sample.filename)[1]
-    target_filename = f"{final_voice_name}_{int(time.time() * 1000)}{ext}"
-    target_filepath = os.path.join(models_dir, target_filename)
-
-    with open(target_filepath, "wb") as f:
-        shutil.copyfileobj(sample.file, f)
+    # Check if voice name already exists
+    result = await db.execute(select(Voice).where(Voice.voice_name == body.voiceName))
+    if result.scalar_one_or_none():
+        raise HTTPException(status_code=400, detail="Voice name already exists")
 
     new_voice = Voice(
-        voice_name=final_voice_name,
-        file_path=target_filepath,
-        original_filename=sample.filename
+        voice_name=body.voiceName,
+        is_blended=True,
+        voice_a=body.voiceA,
+        voice_b=body.voiceB,
+        ratio=body.ratio
     )
     db.add(new_voice)
     await db.commit()
 
-    return {"success": True, "message": "Voice embedding trained successfully", "voiceName": final_voice_name}
+    return {"success": True, "message": f"Voice '{body.voiceName}' blended successfully", "voiceName": body.voiceName}
 
 class ClientRequest(BaseModel):
     username: str

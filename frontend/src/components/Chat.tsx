@@ -220,7 +220,7 @@ export default function Chat() {
 
         <div className="flex items-center gap-3">
           <label htmlFor="voice-select" className="text-xs font-semibold text-slate-600 font-mono flex items-center gap-1.5">
-            <Globe size={13} className="text-slate-400" /> Trained Voices:
+            <Globe size={13} className="text-slate-400" /> System & Blended:
           </label>
           <select
             id="voice-select"
@@ -244,10 +244,10 @@ export default function Chat() {
               ))}
             </optgroup>
             {customVoices.length > 0 && (
-              <optgroup label="🎙️ Trained/Custom Voices">
+              <optgroup label="🎙️ Blended Voices">
                 {customVoices.map(v => (
                   <option key={v.id} value={v.voice_name}>
-                    {v.voice_name} (Custom)
+                    {v.voice_name} (Blended)
                   </option>
                 ))}
               </optgroup>

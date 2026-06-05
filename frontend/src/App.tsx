@@ -1,6 +1,6 @@
 import { Routes, Route, Link } from "react-router";
 import Chat from "./components/Chat";
-import Training from "./components/Training";
+import Blending from "./components/Blending";
 import ApiClients from "./components/ApiClients";
 import Analytics from "./components/Analytics";
 
@@ -23,15 +23,15 @@ export default function App() {
           <Link to="/clients" className="px-5 py-2 bg-slate-600 hover:bg-slate-700 text-white text-xs font-bold uppercase tracking-widest rounded transition-all shadow-sm">
             API Clients
           </Link>
-          <Link to="/train" className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold uppercase tracking-widest rounded transition-all shadow-sm">
-            Train Voice
+          <Link to="/blend" className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold uppercase tracking-widest rounded transition-all shadow-sm">
+            Blend Voices
           </Link>
         </div>
       </header>
       <main className="flex-1 flex overflow-hidden">
         <Routes>
           <Route path="/" element={<Chat />} />
-          <Route path="/train" element={<Training />} />
+          <Route path="/blend" element={<Blending />} />
           <Route path="/clients" element={<ApiClients />} />
           <Route path="/analytics" element={<Analytics />} />
         </Routes>

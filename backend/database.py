@@ -1,6 +1,6 @@
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 from sqlalchemy.orm import declarative_base, relationship, Mapped, mapped_column
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Text
+from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Text, Float, Boolean
 from datetime import datetime
 import os
 
@@ -18,9 +18,13 @@ Base = declarative_base()
 class Voice(Base):
     __tablename__ = "voices"
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
-    voice_name = Column(String, nullable=False)
-    file_path = Column(String, nullable=False)
-    original_filename = Column(String, nullable=False)
+    voice_name = Column(String, nullable=False, unique=True)
+    is_blended = Column(Boolean, default=False)
+    voice_a = Column(String, nullable=True)
+    voice_b = Column(String, nullable=True)
+    ratio = Column(Float, nullable=True, default=0.5)
+    file_path = Column(String, nullable=True)
+    original_filename = Column(String, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
 class ApiClient(Base):

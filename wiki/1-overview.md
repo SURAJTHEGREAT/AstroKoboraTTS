@@ -1,6 +1,6 @@
 # Overview
 
-Kokoro TTS is an optimized local, in-memory Text-to-Speech (TTS) application built to run locally using a modern full-stack JavaScript environment. Unlike traditional cloud-based TTS solutions that rely on remote APIs, this framework runs the powerful TTS models natively inside a Node.js process using ONNX runtime capabilities. This approach offers significant benefits including low latency, privacy, and the elimination of external API dependency costs.
+Kokoro TTS is an optimized local, in-memory Text-to-Speech (TTS) application built to run locally using a modern React and FastAPI environment. Unlike traditional cloud-based TTS solutions that rely on remote APIs, this framework runs the powerful TTS models natively inside a Python process using ONNX runtime capabilities. This approach offers significant benefits including low latency, privacy, and the elimination of external API dependency costs.
 
 ## First Principles of Text-to-Speech in Kokoro
 
@@ -12,10 +12,10 @@ At its core, a Text-to-Speech system aims to convert written human language (tex
 
 ## High-Level Capabilities
 
-- **In-Memory Generation**: Relies on `kokoro-js` with the `onnx-community/Kokoro-82M-v1.0-ONNX` model optimized for CPUs.
+- **In-Memory Generation**: Relies on `kokoro-onnx` with the `onnx-community/Kokoro-82M-v1.0-ONNX` model optimized for CPUs.
 - **Real-Time Streaming**: By leveraging Server-Sent Events (SSE), the application can stream audio chunks to the frontend as they are generated, rather than waiting for the entire text to be processed.
 - **Custom Voice Training**: Allows users to upload custom `.wav` samples to create unique voice embeddings stored locally and tracked via SQLite.
-- **Full-Stack Integration**: Provides a comprehensive React frontend for user interaction and an Express backend for API management.
+- **Full-Stack Integration**: Provides a comprehensive React frontend for user interaction and an FastAPI backend for API management.
 - **Analytics & Tracking**: Tracks API usage, words processed, and Time To First Byte (TTFB) to monitor performance.
 
 By keeping all these processes localized and utilizing efficient ONNX inference engines, Kokoro TTS provides a robust, fast, and completely private text-to-speech solution.

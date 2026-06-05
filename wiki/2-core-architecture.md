@@ -1,6 +1,6 @@
 # Core Architecture
 
-The Kokoro TTS application follows a full-stack JavaScript architecture, segmented into a client-side frontend, a server-side backend, an embedded machine learning inference engine, and persistent storage layers. This modular design ensures that the heavy lifting of speech generation is tightly integrated with the API layer without sacrificing UI responsiveness.
+The Kokoro TTS application follows a full-stack React/FastAPI architecture, segmented into a client-side frontend, a server-side backend, an embedded machine learning inference engine, and persistent storage layers. This modular design ensures that the heavy lifting of speech generation is tightly integrated with the API layer without sacrificing UI responsiveness.
 
 ## System Architecture Overview
 
@@ -11,14 +11,14 @@ The system is composed of the following major components:
    - Handles text input, custom voice upload forms, audio playback, and visualizes analytics using Recharts.
    - Communicates with the backend primarily via REST APIs and Server-Sent Events (SSE) for real-time audio chunk delivery.
 
-2. **Backend (Express.js)**:
+2. **Backend (FastAPI)**:
    - Serves as the central orchestrator and API gateway.
    - Exposes RESTful endpoints for TTS generation (`/api/tts`), voice training (`/api/train`), and analytics (`/api/analytics`).
    - Can run in an "API-only" mode (`API_ONLY=true`) to bypass static file serving for headless integrations.
    - Interfaces directly with the SQLite database for metadata management and the file system for audio/model storage.
 
-3. **Inference Engine (`kokoro-js` & ONNX Runtime)**:
-   - Embedded directly within the Node.js backend process.
+3. **Inference Engine (`kokoro-onnx` & ONNX Runtime)**:
+   - Embedded directly within the Python backend process.
    - Executes the pre-trained `Kokoro-82M-v1.0-ONNX` model using the ONNX Runtime for CPU.
    - Responsible for text normalization, grapheme-to-phoneme conversion, spectrogram generation, and final audio synthesis.
 
@@ -28,4 +28,4 @@ The system is composed of the following major components:
 
 ## Execution Flow Summary
 
-When a user requests speech generation, the Express backend receives the text and delegates it to the embedded `kokoro-js` instance. The ONNX model processes the text and streams the output directly back through the Express server as audio chunks via SSE, while simultaneously logging usage statistics to the SQLite database.
+When a user requests speech generation, the FastAPI backend receives the text and delegates it to the embedded `kokoro-onnx` instance. The ONNX model processes the text and streams the output directly back through the FastAPI server as audio chunks via SSE, while simultaneously logging usage statistics to the SQLite database.

@@ -133,17 +133,9 @@ export default function Chat() {
     setIsGenerating(false);
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!input.trim() || isGenerating) return;
-
-    const userMessage = input.trim();
-    setInput("");
-    setMessages(prev => [...prev, { role: "user", content: userMessage }]);
+  const generateTTS = async (text: string, voice: string) => {
     setIsGenerating(true);
     setCurrentResponse("");
-
-    // Initialize abort controller
     abortController.current = new AbortController();
 
     let accumulatedText = "";
@@ -153,7 +145,7 @@ export default function Chat() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         signal: abortController.current.signal,
-        body: JSON.stringify({ message: userMessage, voice: selectedVoice }),
+        body: JSON.stringify({ message: text, voice: voice }),
       });
 
       if (!response.body) throw new Error("No response body");
@@ -199,14 +191,14 @@ export default function Chat() {
         }
       }
 
-      setMessages(prev => [...prev, { role: "assistant", content: accumulatedText, voice: selectedVoice }]);
+      setMessages(prev => [...prev, { role: "assistant", content: accumulatedText, voice: voice }]);
       setCurrentResponse("");
 
     } catch (err: any) {
       if (err.name === 'AbortError') {
         console.log("TTS generation aborted by user");
         if (accumulatedText) {
-          setMessages(prev => [...prev, { role: "assistant", content: accumulatedText, voice: selectedVoice }]);
+          setMessages(prev => [...prev, { role: "assistant", content: accumulatedText, voice: voice }]);
         }
       } else {
         console.error("Failed to send message", err);
@@ -216,6 +208,22 @@ export default function Chat() {
       setCurrentResponse("");
       abortController.current = null;
     }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!input.trim() || isGenerating) return;
+
+    const userMessage = input.trim();
+    setInput("");
+    setMessages(prev => [...prev, { role: "user", content: userMessage }]);
+
+    await generateTTS(userMessage, selectedVoice);
+  };
+
+  const handleApplyVoice = async (text: string) => {
+    if (isGenerating || input.trim() !== "") return;
+    await generateTTS(text, selectedVoice);
   };
 
   const currentVoiceObj = 
@@ -311,13 +319,24 @@ export default function Chat() {
               </div>
               <div className={`p-4 max-w-lg ${msg.role === "user" ? "bg-slate-100 border border-slate-200/60 rounded-2xl rounded-tr-none" : "bg-indigo-50 border border-indigo-100 rounded-2xl rounded-tl-none"}`}>
                 <p className="text-sm leading-relaxed text-slate-800">{msg.content}</p>
-                {msg.role === "assistant" && msg.voice && (
-                  <div className="mt-2.5 pt-2 border-t border-indigo-100 flex items-center gap-1.5 text-[10px] font-medium text-indigo-600 font-mono uppercase tracking-wider opacity-85">
-                    <Sparkles size={11} className="text-indigo-500/80" /> Voice Profile: {
-                      AVAILABLE_VOICES.find(v => v.id === msg.voice)?.name || 
-                      customVoices.find(v => v.voice_name === msg.voice)?.voice_name || 
-                      msg.voice
-                    }
+                {msg.role === "assistant" && (
+                  <div className="mt-2.5 pt-2 border-t border-indigo-100">
+                    {msg.voice && (
+                      <div className="flex items-center gap-1.5 text-[10px] font-medium text-indigo-600 font-mono uppercase tracking-wider opacity-85 mb-2">
+                        <Sparkles size={11} className="text-indigo-500/80" /> Voice Profile: {
+                          AVAILABLE_VOICES.find(v => v.id === msg.voice)?.name ||
+                          customVoices.find(v => v.voice_name === msg.voice)?.voice_name ||
+                          msg.voice
+                        }
+                      </div>
+                    )}
+                    <button
+                      onClick={() => handleApplyVoice(msg.content)}
+                      disabled={isGenerating || input.trim() !== ""}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-white border border-indigo-200 text-[11px] font-bold text-indigo-600 hover:bg-indigo-50 hover:border-indigo-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:border-slate-200 disabled:text-slate-400"
+                    >
+                      <Sparkles size={12} /> APPLY
+                    </button>
                   </div>
                 )}
               </div>

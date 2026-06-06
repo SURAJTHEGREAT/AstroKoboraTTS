@@ -1,11 +1,26 @@
 import { Routes, Route, Link } from "react-router";
+import { useState, useMemo } from "react";
+import { v4 as uuidv4 } from 'uuid';
 import Chat from "./components/Chat";
 import Blending from "./components/Blending";
 import ApiClients from "./components/ApiClients";
 import Analytics from "./components/Analytics";
 import History from "./components/History";
 
+type Message = {
+  id: string;
+  role: "user" | "assistant";
+  content: string;
+  voice?: string;
+  status?: "generating" | "finished" | "interrupted";
+  audioUrl?: string;
+};
+
 export default function App() {
+  const sessionId = useMemo(() => uuidv4(), []);
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [chatInput, setChatInput] = useState("");
+
   return (
     <div className="flex flex-col h-screen w-full bg-slate-50 text-slate-800 font-sans">
       <header className="h-16 flex items-center justify-between px-8 border-b border-slate-200 bg-white shadow-sm">
@@ -34,7 +49,7 @@ export default function App() {
       </header>
       <main className="flex-1 flex overflow-hidden">
         <Routes>
-          <Route path="/" element={<Chat />} />
+          <Route path="/" element={<Chat sessionId={sessionId} messages={messages} setMessages={setMessages} input={chatInput} setInput={setChatInput} />} />
           <Route path="/history" element={<History />} />
           <Route path="/blend" element={<Blending />} />
           <Route path="/clients" element={<ApiClients />} />

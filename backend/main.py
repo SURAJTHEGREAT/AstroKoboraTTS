@@ -247,39 +247,6 @@ async def tts_endpoint(request: Request, body: TTSRequest, db: AsyncSession = De
             )
             db.add(new_stat)
             await db.commit()
-        else:
-            # Handle History (Web Chat Only)
-            if all_samples:
-                final_audio = np.concatenate(all_samples)
-                history_filename = f"history-{int(time.time())}-{uuid.uuid4().hex[:8]}.wav"
-                history_filepath = os.path.join(history_dir, history_filename)
-
-                await loop.run_in_executor(
-                    None,
-                    lambda: sf.write(history_filepath, final_audio, sample_rate)
-                )
-
-                new_history = TtsHistory(
-                    text=message,
-                    voice=requested_voice,
-                    audio_path=history_filename
-                )
-                db.add(new_history)
-                await db.commit()
-
-                # Maintain last 100 limit
-                result = await db.execute(select(TtsHistory).order_by(TtsHistory.created_at.desc()).offset(100))
-                old_records = result.scalars().all()
-                for old_rec in old_records:
-                    old_path = os.path.join(history_dir, old_rec.audio_path)
-                    if os.path.exists(old_path):
-                        try:
-                            os.remove(old_path)
-                        except OSError:
-                            pass
-                    db.delete(old_rec)
-                if old_records:
-                    await db.commit()
 
         if not interrupted:
             # Save session audio
@@ -448,38 +415,73 @@ async def get_voices(request: Request, db: AsyncSession = Depends(get_db)):
 class HistorySaveRequest(BaseModel):
     text: str
     voice: str
+    session_id: str
+    message_id: str
 
 @app.post("/api/history/save")
 async def save_history(body: HistorySaveRequest, db: AsyncSession = Depends(get_db)):
-    # Delete all previous history (keep only one)
-    await db.execute(delete(TtsHistory))
+    session_id = sanitize_id(body.session_id)
+    message_id = sanitize_id(body.message_id)
 
-    # We don't store the audio file anymore, reconstruction is on-the-fly
+    if not session_id or not message_id:
+        raise HTTPException(status_code=400, detail="session_id and message_id are required")
+
+    session_filename = f"{session_id}_{message_id}.wav"
+    session_filepath = os.path.join(session_audio_dir, session_filename)
+
+    if not os.path.exists(session_filepath):
+        raise HTTPException(status_code=404, detail="Session audio not found. It might have been cleared.")
+
+    history_filename = f"saved-{int(time.time())}-{uuid.uuid4().hex[:8]}.wav"
+    history_filepath = os.path.join(history_dir, history_filename)
+
+    # Copy file to history directory
+    shutil.copy2(session_filepath, history_filepath)
+
     new_history = TtsHistory(
         text=body.text,
         voice=body.voice,
-        audio_path="RECONSTRUCT_ON_FLY"
+        audio_path=history_filename
     )
     db.add(new_history)
     await db.commit()
+
+    # Maintain last 50 limit
+    result = await db.execute(
+        select(TtsHistory).order_by(TtsHistory.created_at.desc()).offset(50)
+    )
+    old_records = result.scalars().all()
+    for old_rec in old_records:
+        old_path = os.path.join(history_dir, old_rec.audio_path)
+        if os.path.exists(old_path):
+            try:
+                os.remove(old_path)
+            except OSError:
+                pass
+        await db.delete(old_rec)
+
+    if old_records:
+        await db.commit()
+
     return {"success": True}
 
 @app.get("/api/history")
 async def get_history(db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(TtsHistory).order_by(TtsHistory.created_at.desc()).limit(1))
-    h = result.scalar_one_or_none()
-    if not h:
-        return []
+    result = await db.execute(select(TtsHistory).order_by(TtsHistory.created_at.desc()))
+    records = result.scalars().all()
     return [{
         "id": h.id,
         "text": h.text,
         "voice": h.voice,
+        "audio_url": f"/api/history/audio/{h.audio_path}",
         "created_at": h.created_at.isoformat()
-    }]
+    } for h in records]
 
-@app.get("/api/history/download/{history_id}")
-async def download_history(history_id: int, db: AsyncSession = Depends(get_db)):
-    # This might need to be reconsidered if we want download to work without reconstruction first.
-    # User said "re-generate the audio and I would listen and download it both option should be available".
-    # History page will trigger reconstruction (TTS) and then download the result.
-    raise HTTPException(status_code=405, detail="Use reconstruction for history download")
+@app.get("/api/history/audio/{filename}")
+async def get_history_audio(filename: str):
+    # Basic filename sanitization
+    filename = re.sub(r'[^a-zA-Z0-9._-]', '', filename)
+    filepath = os.path.join(history_dir, filename)
+    if not os.path.exists(filepath):
+        raise HTTPException(status_code=404, detail="History audio file not found")
+    return FileResponse(filepath)

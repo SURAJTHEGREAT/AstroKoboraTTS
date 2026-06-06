@@ -1,11 +1,15 @@
-import React, { useState, useRef, useEffect } from "react";
-import { Mic, Send, Loader2, Volume2, User, Bot, Globe, Sparkles, Square } from "lucide-react";
+import React, { useState, useRef, useEffect, useMemo } from "react";
+import { Mic, Send, Loader2, Volume2, User, Bot, Globe, Sparkles, Square, Save, CircleOff } from "lucide-react";
 import { Link } from "react-router";
+import { v4 as uuidv4 } from 'uuid';
 
 type Message = {
+  id: string;
   role: "user" | "assistant";
   content: string;
   voice?: string;
+  status?: "generating" | "finished" | "interrupted";
+  audioUrl?: string;
 };
 
 const AVAILABLE_VOICES = [
@@ -31,6 +35,7 @@ const AVAILABLE_VOICES = [
 ];
 
 export default function Chat() {
+  const sessionId = useMemo(() => uuidv4(), []);
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
@@ -46,6 +51,9 @@ export default function Chat() {
   const abortController = useRef<AbortController | null>(null);
 
   useEffect(() => {
+    // Clear session on mount
+    fetch(`/api/session/clear/${sessionId}`, { method: 'DELETE' }).catch(console.error);
+
     const fetchCustomVoices = async () => {
       try {
         const response = await fetch("/api/voices");
@@ -131,12 +139,31 @@ export default function Chat() {
     audioQueue.current = [];
     isPlaying.current = false;
     setIsGenerating(false);
+
+    // Mark last assistant message as interrupted
+    setMessages(prev => {
+      const last = prev[prev.length - 1];
+      if (last && last.role === "assistant" && last.status === "generating") {
+        return [...prev.slice(0, -1), { ...last, status: "interrupted" }];
+      }
+      return prev;
+    });
   };
 
   const generateTTS = async (text: string, voice: string) => {
+    const messageId = uuidv4();
     setIsGenerating(true);
     setCurrentResponse("");
     abortController.current = new AbortController();
+
+    // Add initial empty assistant message
+    setMessages(prev => [...prev, {
+      id: messageId,
+      role: "assistant",
+      content: "",
+      voice: voice,
+      status: "generating"
+    }]);
 
     let accumulatedText = "";
 
@@ -145,7 +172,12 @@ export default function Chat() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         signal: abortController.current.signal,
-        body: JSON.stringify({ message: text, voice: voice }),
+        body: JSON.stringify({
+          message: text,
+          voice: voice,
+          session_id: sessionId,
+          message_id: messageId
+        }),
       });
 
       if (!response.body) throw new Error("No response body");
@@ -180,8 +212,16 @@ export default function Chat() {
                 if (data.status === "text") {
                   accumulatedText += data.text;
                   setCurrentResponse(accumulatedText);
+                  setMessages(prev => prev.map(m =>
+                    m.id === messageId ? { ...m, content: accumulatedText } : m
+                  ));
                 } else if (data.status === "audio" && data.audioUrl) {
                   enqueueAudio(data.audioUrl);
+                } else if (data.status === "done" && data.audioUrl) {
+                   // This is the final concatenated URL
+                   setMessages(prev => prev.map(m =>
+                    m.id === messageId ? { ...m, status: "finished", audioUrl: data.audioUrl } : m
+                  ));
                 }
               } catch (parseError) {
                 console.error("Error parsing stream chunk", dataStr, parseError);
@@ -191,15 +231,12 @@ export default function Chat() {
         }
       }
 
-      setMessages(prev => [...prev, { role: "assistant", content: accumulatedText, voice: voice }]);
       setCurrentResponse("");
 
     } catch (err: any) {
       if (err.name === 'AbortError') {
         console.log("TTS generation aborted by user");
-        if (accumulatedText) {
-          setMessages(prev => [...prev, { role: "assistant", content: accumulatedText, voice: voice }]);
-        }
+        // Handled in handleStop
       } else {
         console.error("Failed to send message", err);
       }
@@ -216,7 +253,7 @@ export default function Chat() {
 
     const userMessage = input.trim();
     setInput("");
-    setMessages(prev => [...prev, { role: "user", content: userMessage }]);
+    setMessages(prev => [...prev, { id: uuidv4(), role: "user", content: userMessage }]);
 
     await generateTTS(userMessage, selectedVoice);
   };
@@ -224,6 +261,33 @@ export default function Chat() {
   const handleApplyVoice = async (text: string) => {
     if (isGenerating || input.trim() !== "") return;
     await generateTTS(text, selectedVoice);
+  };
+
+  const handleSaveHistory = async (text: string, voice: string) => {
+    try {
+      await fetch("/api/history/save", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text, voice }),
+      });
+      alert("Saved to history!");
+    } catch (err) {
+      console.error("Failed to save history", err);
+    }
+  };
+
+  const handlePlayAudio = async (url: string) => {
+    if (isPlaying.current) {
+      if (activeSource.current) {
+        activeSource.current.stop();
+        activeSource.current = null;
+      }
+      audioQueue.current = [];
+      isPlaying.current = false;
+    }
+
+    audioQueue.current = [url];
+    playNextAudio();
   };
 
   const currentVoiceObj = 
@@ -312,50 +376,80 @@ export default function Chat() {
             </p>
           </div>
         ) : (
-          messages.map((msg, idx) => (
-            <div key={idx} className={`flex gap-4 ${msg.role === "user" ? "flex-row-reverse" : ""}`}>
-              <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${msg.role === "user" ? "bg-slate-200 text-slate-700" : "bg-indigo-600 text-white shadow-xs"}`}>
-                {msg.role === "user" ? "US" : "TTS"}
-              </div>
-              <div className={`p-4 max-w-lg ${msg.role === "user" ? "bg-slate-100 border border-slate-200/60 rounded-2xl rounded-tr-none" : "bg-indigo-50 border border-indigo-100 rounded-2xl rounded-tl-none"}`}>
-                <p className="text-sm leading-relaxed text-slate-800">{msg.content}</p>
-                {msg.role === "assistant" && (
-                  <div className="mt-2.5 pt-2 border-t border-indigo-100">
-                    {msg.voice && (
-                      <div className="flex items-center gap-1.5 text-[10px] font-medium text-indigo-600 font-mono uppercase tracking-wider opacity-85 mb-2">
-                        <Sparkles size={11} className="text-indigo-500/80" /> Voice Profile: {
-                          AVAILABLE_VOICES.find(v => v.id === msg.voice)?.name ||
-                          customVoices.find(v => v.voice_name === msg.voice)?.voice_name ||
-                          msg.voice
-                        }
-                      </div>
+          messages.map((msg, idx) => {
+            const isLastMessage = idx === messages.length - 1;
+            return (
+              <div key={msg.id} className={`flex gap-4 ${msg.role === "user" ? "flex-row-reverse" : ""}`}>
+                <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${msg.role === "user" ? "bg-slate-200 text-slate-700" : "bg-indigo-600 text-white shadow-xs"}`}>
+                  {msg.role === "user" ? "US" : "TTS"}
+                </div>
+                <div className={`p-4 max-w-lg ${msg.role === "user" ? "bg-slate-100 border border-slate-200/60 rounded-2xl rounded-tr-none" : "bg-indigo-50 border border-indigo-100 rounded-2xl rounded-tl-none"}`}>
+                  <p className="text-sm leading-relaxed text-slate-800 whitespace-pre-wrap">
+                    {msg.content}
+                    {msg.status === "generating" && (
+                      <span className="inline-block w-1.5 h-4 ml-1 bg-indigo-600 animate-pulse align-middle" />
                     )}
-                    <button
-                      onClick={() => handleApplyVoice(msg.content)}
-                      disabled={isGenerating || input.trim() !== ""}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-white border border-indigo-200 text-[11px] font-bold text-indigo-600 hover:bg-indigo-50 hover:border-indigo-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:border-slate-200 disabled:text-slate-400"
-                    >
-                      <Sparkles size={12} /> APPLY
-                    </button>
-                  </div>
-                )}
+                    {msg.status === "interrupted" && !msg.content && (
+                      <span className="text-slate-400 italic">Generation stopped.</span>
+                    )}
+                  </p>
+                  {msg.role === "assistant" && (
+                    <div className="mt-2.5 pt-2 border-t border-indigo-100">
+                      {msg.voice && (
+                        <div className="flex items-center gap-1.5 text-[10px] font-medium text-indigo-600 font-mono uppercase tracking-wider opacity-85 mb-2">
+                          <Sparkles size={11} className="text-indigo-500/80" /> Voice Profile: {
+                            AVAILABLE_VOICES.find(v => v.id === msg.voice)?.name ||
+                            customVoices.find(v => v.voice_name === msg.voice)?.voice_name ||
+                            msg.voice
+                          }
+                        </div>
+                      )}
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => handleApplyVoice(msg.content)}
+                          disabled={!isLastMessage || isGenerating || input.trim() !== ""}
+                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-white border border-indigo-200 text-[11px] font-bold text-indigo-600 hover:bg-indigo-50 hover:border-indigo-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:border-slate-200 disabled:text-slate-400"
+                        >
+                          <Sparkles size={12} /> APPLY
+                        </button>
+
+                        <button
+                          onClick={() => handleSaveHistory(msg.content, msg.voice || selectedVoice)}
+                          disabled={isGenerating}
+                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-white border border-emerald-200 text-[11px] font-bold text-emerald-600 hover:bg-emerald-50 hover:border-emerald-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-xs"
+                        >
+                          <Save size={12} /> SAVE
+                        </button>
+
+                        {msg.status === "finished" && msg.audioUrl && (
+                          <button
+                            onClick={() => handlePlayAudio(msg.audioUrl!)}
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-indigo-600 text-white text-[11px] font-bold hover:bg-indigo-700 transition-colors shadow-xs"
+                          >
+                            <Volume2 size={12} /> PLAY
+                          </button>
+                        )}
+
+                        {msg.status === "interrupted" && (
+                          <div className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold text-red-500">
+                            <CircleOff size={12} /> INTERRUPTED
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
-          ))
+            );
+          })
         )}
         
-        {isGenerating && (
+        {isGenerating && !currentResponse && (
           <div className="flex gap-4">
             <div className="flex-shrink-0 w-8 h-8 rounded-full bg-indigo-600 flex items-center justify-center text-xs font-bold text-white shadow-xs">
               TTS
             </div>
             <div className="bg-indigo-50 border border-indigo-100 p-4 rounded-2xl rounded-tl-none max-w-lg">
-              {currentResponse ? (
-                <p className="text-sm leading-relaxed text-slate-800 whitespace-pre-wrap">
-                  {currentResponse}
-                  <span className="inline-block w-1.5 h-4 ml-1 bg-indigo-600 animate-pulse align-middle" />
-                </p>
-              ) : (
                 <div className="flex items-center gap-3">
                    <div className="flex gap-1 h-3 items-end opacity-70">
                      <div className="w-1 bg-indigo-600 h-2 animate-bounce" style={{animationDelay: "0ms"}}></div>
@@ -365,7 +459,6 @@ export default function Chat() {
                    </div>
                    <span className="text-[10px] font-mono text-indigo-600 font-semibold animate-pulse">Synthesizing chunk...</span>
                 </div>
-              )}
             </div>
           </div>
         )}

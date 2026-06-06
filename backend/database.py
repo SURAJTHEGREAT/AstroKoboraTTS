@@ -4,7 +4,19 @@ from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Text, Floa
 from datetime import datetime
 import os
 
-data_dir = os.path.join(os.getcwd(), "data")
+data_dir = os.environ.get("DATA_DIR")
+if not data_dir:
+    cwd_data = os.path.join(os.getcwd(), "data")
+    parent_data = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "data")
+    if os.path.exists(cwd_data):
+        data_dir = os.path.abspath(cwd_data)
+    elif os.path.exists(parent_data):
+        data_dir = os.path.abspath(parent_data)
+    else:
+        data_dir = os.path.abspath(cwd_data)
+else:
+    data_dir = os.path.abspath(data_dir)
+
 os.makedirs(data_dir, exist_ok=True)
 db_path = os.path.join(data_dir, "metadata.db")
 

@@ -14,6 +14,7 @@ type Message = {
   voice?: string;
   status?: "generating" | "finished" | "interrupted";
   audioUrl?: string;
+  isSaved?: boolean;
 };
 
 export default function App() {

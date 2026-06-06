@@ -1,13 +1,19 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router';
 import Chat from '../src/components/Chat';
+
+const ChatTestWrapper = () => {
+  const [messages, setMessages] = useState<any[]>([]);
+  const [input, setInput] = useState("");
+  return <Chat sessionId="test-session" messages={messages} setMessages={setMessages} input={input} setInput={setInput} />;
+};
 
 describe('Chat Component', () => {
   it('renders chat interface correctly', async () => {
     render(
       <MemoryRouter>
-        <Chat />
+        <ChatTestWrapper />
       </MemoryRouter>
     );
 

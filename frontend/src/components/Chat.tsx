@@ -10,6 +10,7 @@ type Message = {
   voice?: string;
   status?: "generating" | "finished" | "interrupted";
   audioUrl?: string;
+  isSaved?: boolean;
 };
 
 interface ChatProps {
@@ -47,6 +48,7 @@ export default function Chat({ sessionId, messages, setMessages, input, setInput
   const [currentResponse, setCurrentResponse] = useState("");
   const [selectedVoice, setSelectedVoice] = useState("af_heart");
   const [customVoices, setCustomVoices] = useState<any[]>([]);
+  const [currentlyPlayingId, setCurrentlyPlayingId] = useState<string | null>(null);
   
   // Audio playback queue
   const audioQueue = useRef<string[]>([]);
@@ -56,9 +58,6 @@ export default function Chat({ sessionId, messages, setMessages, input, setInput
   const abortController = useRef<AbortController | null>(null);
 
   useEffect(() => {
-    // Clear session on mount
-    fetch(`/api/session/clear/${sessionId}`, { method: 'DELETE' }).catch(console.error);
-
     const fetchCustomVoices = async () => {
       try {
         const response = await fetch("/api/voices");
@@ -82,6 +81,7 @@ export default function Chat({ sessionId, messages, setMessages, input, setInput
   const playNextAudio = async () => {
     if (audioQueue.current.length === 0) {
       isPlaying.current = false;
+      setCurrentlyPlayingId(null);
       return;
     }
 
@@ -276,7 +276,7 @@ export default function Chat({ sessionId, messages, setMessages, input, setInput
         body: JSON.stringify({ text, voice, session_id: sessionId, message_id: messageId }),
       });
       if (response.ok) {
-        alert("Saved to history!");
+        setMessages(prev => prev.map(m => m.id === messageId ? { ...m, isSaved: true } : m));
       } else {
         const error = await response.json();
         alert(`Failed to save: ${error.detail || "Unknown error"}`);
@@ -286,16 +286,23 @@ export default function Chat({ sessionId, messages, setMessages, input, setInput
     }
   };
 
-  const handlePlayAudio = async (url: string) => {
+  const handlePlayAudio = async (id: string, url: string) => {
     if (isPlaying.current) {
+      const isCurrentlyPlayingThis = currentlyPlayingId === id;
+
       if (activeSource.current) {
         activeSource.current.stop();
         activeSource.current = null;
       }
       audioQueue.current = [];
       isPlaying.current = false;
+      setCurrentlyPlayingId(null);
+
+      // If we clicked the same button, just stop.
+      if (isCurrentlyPlayingThis) return;
     }
 
+    setCurrentlyPlayingId(id);
     audioQueue.current = [url];
     playNextAudio();
   };
@@ -418,25 +425,34 @@ export default function Chat({ sessionId, messages, setMessages, input, setInput
                         <button
                           onClick={() => handleApplyVoice(msg.content)}
                           disabled={!isLastMessage || isGenerating || input.trim() !== ""}
-                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-white border border-indigo-200 text-[11px] font-bold text-indigo-600 hover:bg-indigo-50 hover:border-indigo-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:border-slate-200 disabled:text-slate-400"
+                          className="flex items-center gap-1.5 px-6 py-2 rounded-full bg-white border-2 border-indigo-500 text-[11px] font-bold text-indigo-600 hover:bg-indigo-50 transition-all shadow-md active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:border-slate-200 disabled:text-slate-400"
                         >
                           <Sparkles size={12} /> APPLY
                         </button>
 
                         <button
                           onClick={() => handleSaveHistory(msg.content, msg.voice || selectedVoice, msg.id)}
-                          disabled={isGenerating}
-                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-white border border-emerald-200 text-[11px] font-bold text-emerald-600 hover:bg-emerald-50 hover:border-emerald-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-xs"
+                          disabled={isGenerating || msg.isSaved}
+                          className={`flex items-center gap-1.5 px-6 py-2 rounded-full text-[11px] font-bold transition-all shadow-md active:scale-95 ${
+                            msg.isSaved
+                              ? "bg-slate-100 border border-slate-200 text-slate-400 cursor-not-allowed"
+                              : "bg-white border-2 border-emerald-500 text-emerald-600 hover:bg-emerald-50"
+                          }`}
                         >
-                          <Save size={12} /> SAVE
+                          <Save size={12} /> {msg.isSaved ? "SAVED" : "SAVE"}
                         </button>
 
                         {msg.status === "finished" && msg.audioUrl && (
                           <button
-                            onClick={() => handlePlayAudio(msg.audioUrl!)}
-                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-indigo-600 text-white text-[11px] font-bold hover:bg-indigo-700 transition-colors shadow-xs"
+                            onClick={() => handlePlayAudio(msg.id, msg.audioUrl!)}
+                            className={`flex items-center gap-2 px-6 py-2 rounded-full font-bold text-[11px] shadow-md transition-all active:scale-95 ${
+                              currentlyPlayingId === msg.id
+                                ? "bg-red-600 hover:bg-red-700 text-white"
+                                : "bg-indigo-600 hover:bg-indigo-700 text-white"
+                            }`}
                           >
-                            <Volume2 size={12} /> PLAY
+                            {currentlyPlayingId === msg.id ? <CircleOff size={14} /> : <Volume2 size={14} />}
+                            {currentlyPlayingId === msg.id ? "Stop" : "Listen Now"}
                           </button>
                         )}
 

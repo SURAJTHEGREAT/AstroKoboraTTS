@@ -51,7 +51,7 @@ export default function Analytics() {
   if (!isAuthenticated) {
     return (
       <div className="flex flex-col h-full items-center justify-center p-8 bg-slate-50 overflow-y-auto w-full">
-        <div className="max-w-md w-full bg-white rounded-xl shadow-sm border border-slate-200 p-8">
+        <div className="max-w-md w-full bg-white rounded-xl shadow-sm border border-slate-200 p-8 mb-8">
           <div className="mb-6">
             <h2 className="text-2xl font-semibold text-slate-800">Admin Analytics</h2>
             <p className="text-sm text-slate-500 mt-1">
@@ -104,7 +104,7 @@ export default function Analytics() {
 
   return (
     <div className="flex flex-col h-full items-center p-8 bg-slate-50 overflow-y-auto w-full">
-      <div className="max-w-4xl w-full bg-white rounded-xl shadow-sm border border-slate-200 p-8">
+      <div className="max-w-4xl w-full bg-white rounded-xl shadow-sm border border-slate-200 p-8 mb-8">
         <h2 className="text-2xl font-semibold text-slate-800 mb-6">API Client Analytics</h2>
 
         {data.length === 0 ? (

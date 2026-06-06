@@ -49,7 +49,7 @@ export default function ApiClients() {
 
   return (
     <div className="flex flex-col h-full items-center p-8 bg-slate-50 overflow-y-auto w-full">
-      <div className="max-w-md w-full bg-white rounded-xl shadow-sm border border-slate-200 p-8">
+      <div className="max-w-md w-full bg-white rounded-xl shadow-sm border border-slate-200 p-8 mb-8">
         <div className="mb-6">
           <h2 className="text-2xl font-semibold text-slate-800">Generate API Client</h2>
           <p className="text-sm text-slate-500 mt-1">

@@ -146,6 +146,8 @@ export default function Chat() {
     // Initialize abort controller
     abortController.current = new AbortController();
 
+    let accumulatedText = "";
+
     try {
       const response = await fetch("/api/tts", {
         method: "POST",
@@ -160,7 +162,6 @@ export default function Chat() {
       const decoder = new TextDecoder();
       let done = false;
       
-      let accumulatedText = "";
       let buffer = "";
 
       while (!done) {
@@ -204,11 +205,15 @@ export default function Chat() {
     } catch (err: any) {
       if (err.name === 'AbortError') {
         console.log("TTS generation aborted by user");
+        if (accumulatedText) {
+          setMessages(prev => [...prev, { role: "assistant", content: accumulatedText, voice: selectedVoice }]);
+        }
       } else {
         console.error("Failed to send message", err);
       }
     } finally {
       setIsGenerating(false);
+      setCurrentResponse("");
       abortController.current = null;
     }
   };

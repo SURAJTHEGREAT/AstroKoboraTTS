@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
-import { Mic, Send, Loader2, Volume2, User, Bot, Globe, Sparkles } from "lucide-react";
+import { Mic, Send, Loader2, Volume2, User, Bot, Globe, Sparkles, Square } from "lucide-react";
 import { Link } from "react-router";
 
 type Message = {
@@ -42,6 +42,8 @@ export default function Chat() {
   const audioQueue = useRef<string[]>([]);
   const isPlaying = useRef(false);
   const audioContext = useRef<AudioContext | null>(null);
+  const activeSource = useRef<AudioBufferSourceNode | null>(null);
+  const abortController = useRef<AbortController | null>(null);
 
   useEffect(() => {
     const fetchCustomVoices = async () => {
@@ -88,11 +90,15 @@ export default function Chat() {
       
       const audioBuffer = await audioContext.current.decodeAudioData(arrayBuffer);
       const source = audioContext.current.createBufferSource();
+      activeSource.current = source;
       source.buffer = audioBuffer;
       source.connect(audioContext.current.destination);
       
       source.onended = () => {
-        playNextAudio();
+        if (activeSource.current === source) {
+          activeSource.current = null;
+          playNextAudio();
+        }
       };
       
       source.start();
@@ -109,6 +115,24 @@ export default function Chat() {
     }
   };
 
+  const handleStop = () => {
+    if (abortController.current) {
+      abortController.current.abort();
+      abortController.current = null;
+    }
+
+    // Stop audio playback
+    if (activeSource.current) {
+      activeSource.current.stop();
+      activeSource.current = null;
+    }
+
+    // Clear queue
+    audioQueue.current = [];
+    isPlaying.current = false;
+    setIsGenerating(false);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!input.trim() || isGenerating) return;
@@ -119,10 +143,14 @@ export default function Chat() {
     setIsGenerating(true);
     setCurrentResponse("");
 
+    // Initialize abort controller
+    abortController.current = new AbortController();
+
     try {
       const response = await fetch("/api/tts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        signal: abortController.current.signal,
         body: JSON.stringify({ message: userMessage, voice: selectedVoice }),
       });
 
@@ -173,10 +201,15 @@ export default function Chat() {
       setMessages(prev => [...prev, { role: "assistant", content: accumulatedText, voice: selectedVoice }]);
       setCurrentResponse("");
 
-    } catch (err) {
-      console.error("Failed to send message", err);
+    } catch (err: any) {
+      if (err.name === 'AbortError') {
+        console.log("TTS generation aborted by user");
+      } else {
+        console.error("Failed to send message", err);
+      }
     } finally {
       setIsGenerating(false);
+      abortController.current = null;
     }
   };
 
@@ -325,13 +358,24 @@ export default function Chat() {
             className="w-full bg-slate-50 border border-slate-200 rounded-full py-4 px-6 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all pr-16 text-slate-800 placeholder:text-slate-400 disabled:opacity-50"
           />
           <div className="absolute right-2">
-            <button
-              type="submit"
-              disabled={!input.trim() || isGenerating}
-              className="p-3 bg-indigo-600 rounded-full hover:bg-indigo-500 transition-colors text-white disabled:opacity-50 disabled:hover:bg-indigo-600 shadow-sm"
-            >
-              {isGenerating ? <Loader2 size={18} className="animate-spin" /> : <Send size={18} />}
-            </button>
+            {isGenerating ? (
+              <button
+                type="button"
+                onClick={handleStop}
+                className="p-3 bg-red-600 rounded-full hover:bg-red-500 transition-colors text-white shadow-sm"
+                title="Stop generation"
+              >
+                <Square size={18} fill="currentColor" />
+              </button>
+            ) : (
+              <button
+                type="submit"
+                disabled={!input.trim()}
+                className="p-3 bg-indigo-600 rounded-full hover:bg-indigo-500 transition-colors text-white disabled:opacity-50 disabled:hover:bg-indigo-600 shadow-sm"
+              >
+                <Send size={18} />
+              </button>
+            )}
           </div>
         </form>
       </div>

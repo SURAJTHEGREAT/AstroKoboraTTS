@@ -76,3 +76,58 @@ def test_blend_duplicate_name():
     response = client.post("/api/blend", json=blend_data)
     assert response.status_code == 400
     assert "already exists" in response.json()["detail"]
+
+@pytest.mark.asyncio
+async def test_tts_disconnect():
+    # Mocking request.is_disconnected is tricky with TestClient,
+    # but we can verify the logic by ensuring the loop respects a mock
+    from unittest.mock import AsyncMock, MagicMock
+    from main import tts_endpoint, TTSRequest
+
+    mock_db = AsyncMock()
+    mock_execute_result = MagicMock()
+    mock_execute_result.scalar_one_or_none.return_value = None
+    mock_db.execute.return_value = mock_execute_result
+
+    mock_request = MagicMock()
+    # Mock headers for api_auth_middleware
+    mock_request.headers = {}
+    # Simulate disconnection BEFORE first chunk starts processing
+    # The loop does:
+    # for i, text_chunk in enumerate(chunks):
+    #     if await request.is_disconnected(): break
+    # We use a side_effect that returns True, but then we might need to handle subsequent calls if any
+    mock_request.is_disconnected = AsyncMock(return_value=True)
+
+    body = TTSRequest(message="This is a test message that should be chunked into multiple parts.")
+
+    # We need a mock kokoro_model
+    import main
+    original_model = main.kokoro_model
+    main.kokoro_model = MagicMock()
+    main.kokoro_model.create.return_value = ([0.1, 0.2], 24000)
+
+    try:
+        response = await tts_endpoint(mock_request, body, mock_db)
+
+        chunks = []
+        async for chunk in response.body_iterator:
+            chunks.append(chunk)
+
+        # Should have stopped after first chunk (plus thinking/text status)
+        # 1. Thinking
+        # 2. Text status
+        # 3. First audio chunk
+        # Then it checks is_disconnected and breaks
+
+        assert len(chunks) < 10 # Should not process all chunks of a long message
+        # chunks are strings when using body_iterator on StreamingResponse in this context?
+        # Actually it depends on how it's yielded. main yields strings.
+        # chunks are likely bytes in body_iterator
+        # Should have NO audio chunks because we disconnected immediately
+        assert not any(b"audio" in c if isinstance(c, bytes) else "audio" in c for c in chunks)
+        # Verify it didn't reach the "done" status because it broke early
+        assert not any(b"done" in c if isinstance(c, bytes) else "done" in c for c in chunks)
+
+    finally:
+        main.kokoro_model = original_model

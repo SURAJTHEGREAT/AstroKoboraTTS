@@ -149,6 +149,10 @@ async def tts_endpoint(request: Request, body: TTSRequest, db: AsyncSession = De
         chunks = chunk_text(message, max_words=10)
 
         for i, text_chunk in enumerate(chunks):
+            if await request.is_disconnected():
+                print("Client disconnected, stopping TTS generation.")
+                break
+
             if not text_chunk.strip():
                 continue
 
@@ -200,7 +204,8 @@ async def tts_endpoint(request: Request, body: TTSRequest, db: AsyncSession = De
             db.add(new_stat)
             await db.commit()
 
-        yield f"data: {json.dumps({'status': 'done'})}\n\n"
+        if not await request.is_disconnected():
+            yield f"data: {json.dumps({'status': 'done'})}\n\n"
 
     return StreamingResponse(event_generator(), media_type="text/event-stream")
 

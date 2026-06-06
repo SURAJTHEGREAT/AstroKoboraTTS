@@ -12,6 +12,14 @@ type Message = {
   audioUrl?: string;
 };
 
+interface ChatProps {
+  sessionId: string;
+  messages: Message[];
+  setMessages: React.Dispatch<React.SetStateAction<Message[]>>;
+  input: string;
+  setInput: React.Dispatch<React.SetStateAction<string>>;
+}
+
 const AVAILABLE_VOICES = [
   // American English (US)
   { id: "af_heart", name: "Heart", gender: "Female", region: "US", desc: "Default, highly natural & expressive" },
@@ -34,10 +42,7 @@ const AVAILABLE_VOICES = [
   { id: "bm_daniel", name: "Daniel", gender: "Male", region: "UK", desc: "Friendly & crisp British conversationalist" },
 ];
 
-export default function Chat() {
-  const sessionId = useMemo(() => uuidv4(), []);
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [input, setInput] = useState("");
+export default function Chat({ sessionId, messages, setMessages, input, setInput }: ChatProps) {
   const [isGenerating, setIsGenerating] = useState(false);
   const [currentResponse, setCurrentResponse] = useState("");
   const [selectedVoice, setSelectedVoice] = useState("af_heart");
@@ -263,14 +268,19 @@ export default function Chat() {
     await generateTTS(text, selectedVoice);
   };
 
-  const handleSaveHistory = async (text: string, voice: string) => {
+  const handleSaveHistory = async (text: string, voice: string, messageId: string) => {
     try {
-      await fetch("/api/history/save", {
+      const response = await fetch("/api/history/save", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text, voice }),
+        body: JSON.stringify({ text, voice, session_id: sessionId, message_id: messageId }),
       });
-      alert("Saved to history!");
+      if (response.ok) {
+        alert("Saved to history!");
+      } else {
+        const error = await response.json();
+        alert(`Failed to save: ${error.detail || "Unknown error"}`);
+      }
     } catch (err) {
       console.error("Failed to save history", err);
     }
@@ -414,7 +424,7 @@ export default function Chat() {
                         </button>
 
                         <button
-                          onClick={() => handleSaveHistory(msg.content, msg.voice || selectedVoice)}
+                          onClick={() => handleSaveHistory(msg.content, msg.voice || selectedVoice, msg.id)}
                           disabled={isGenerating}
                           className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-white border border-emerald-200 text-[11px] font-bold text-emerald-600 hover:bg-emerald-50 hover:border-emerald-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-xs"
                         >

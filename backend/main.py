@@ -7,11 +7,12 @@ from fastapi import FastAPI, Depends, Request, HTTPException, status, UploadFile
 from fastapi.responses import StreamingResponse, FileResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import func, select
+from sqlalchemy import func, select, delete
 from pydantic import BaseModel
 import shutil
 import uuid
 import secrets
+import re
 import soundfile as sf
 import numpy as np
 
@@ -43,11 +44,22 @@ os.makedirs(history_dir, exist_ok=True)
 temp_dir = os.path.join(os.getcwd(), "temp_kokoro_chunks")
 os.makedirs(temp_dir, exist_ok=True)
 
+session_audio_dir = os.path.join(data_dir, "session_audio")
+os.makedirs(session_audio_dir, exist_ok=True)
+
 kokoro_model: Optional[Any] = None
 
 @app.on_event("startup")
 async def startup_event():
     await init_db()
+
+    # Clear session audio on startup
+    if os.path.exists(session_audio_dir):
+        for f in os.listdir(session_audio_dir):
+            try:
+                os.remove(os.path.join(session_audio_dir, f))
+            except OSError:
+                pass
 
     # Initialize Kokoro
     global kokoro_model
@@ -95,6 +107,8 @@ async def api_auth_middleware(request: Request, db: AsyncSession = Depends(get_d
 class TTSRequest(BaseModel):
     message: str
     voice: str = "af_heart"
+    session_id: Optional[str] = None
+    message_id: Optional[str] = None
 
 def chunk_text(text: str, max_words: int = 10) -> List[str]:
     words = text.split()
@@ -103,9 +117,17 @@ def chunk_text(text: str, max_words: int = 10) -> List[str]:
         chunks.append(" ".join(words[i:i + max_words]))
     return chunks
 
+def sanitize_id(id_str: Optional[str]) -> Optional[str]:
+    if not id_str:
+        return None
+    return re.sub(r'[^a-zA-Z0-9-]', '', id_str)
+
 @app.post("/api/tts")
 async def tts_endpoint(request: Request, body: TTSRequest, db: AsyncSession = Depends(get_db)):
     client = await api_auth_middleware(request, db)
+
+    session_id = sanitize_id(body.session_id)
+    message_id = sanitize_id(body.message_id)
 
     message = body.message
     if not message:
@@ -153,9 +175,11 @@ async def tts_endpoint(request: Request, body: TTSRequest, db: AsyncSession = De
 
         chunks = chunk_text(message, max_words=10)
 
+        interrupted = False
         for i, text_chunk in enumerate(chunks):
             if await request.is_disconnected():
                 print("Client disconnected, stopping TTS generation.")
+                interrupted = True
                 break
 
             if not text_chunk.strip():
@@ -245,8 +269,20 @@ async def tts_endpoint(request: Request, body: TTSRequest, db: AsyncSession = De
                 if old_records:
                     await db.commit()
 
-        if not await request.is_disconnected():
-            yield f"data: {json.dumps({'status': 'done'})}\n\n"
+        if not interrupted:
+            # Save session audio
+            if session_id and message_id and all_samples:
+                final_audio = np.concatenate(all_samples)
+                session_filename = f"{session_id}_{message_id}.wav"
+                session_filepath = os.path.join(session_audio_dir, session_filename)
+
+                await loop.run_in_executor(
+                    None,
+                    lambda: sf.write(session_filepath, final_audio, sample_rate)
+                )
+                yield f"data: {json.dumps({'status': 'done', 'audioUrl': f'/api/session/audio/{session_filename}'})}\n\n"
+            else:
+                yield f"data: {json.dumps({'status': 'done'})}\n\n"
 
     return StreamingResponse(event_generator(), media_type="text/event-stream")
 
@@ -256,6 +292,29 @@ async def get_audio(filename: str):
     if not os.path.exists(filepath):
         raise HTTPException(status_code=404, detail="Audio file not found")
     return FileResponse(filepath)
+
+@app.get("/api/session/audio/{filename}")
+async def get_session_audio(filename: str):
+    # Basic filename sanitization
+    filename = re.sub(r'[^a-zA-Z0-9._-]', '', filename)
+    filepath = os.path.join(session_audio_dir, filename)
+    if not os.path.exists(filepath):
+        raise HTTPException(status_code=404, detail="Audio file not found")
+    return FileResponse(filepath)
+
+@app.delete("/api/session/clear/{session_id}")
+async def clear_session(session_id: str):
+    session_id = sanitize_id(session_id)
+    if not session_id:
+        return {"success": True}
+
+    for f in os.listdir(session_audio_dir):
+        if f.startswith(f"{session_id}_"):
+            try:
+                os.remove(os.path.join(session_audio_dir, f))
+            except OSError:
+                pass
+    return {"success": True}
 
 class BlendRequest(BaseModel):
     username: str
@@ -374,33 +433,41 @@ async def get_voices(request: Request, db: AsyncSession = Depends(get_db)):
         for v in voices
     ]
 
+class HistorySaveRequest(BaseModel):
+    text: str
+    voice: str
+
+@app.post("/api/history/save")
+async def save_history(body: HistorySaveRequest, db: AsyncSession = Depends(get_db)):
+    # Delete all previous history (keep only one)
+    await db.execute(delete(TtsHistory))
+
+    # We don't store the audio file anymore, reconstruction is on-the-fly
+    new_history = TtsHistory(
+        text=body.text,
+        voice=body.voice,
+        audio_path="RECONSTRUCT_ON_FLY"
+    )
+    db.add(new_history)
+    await db.commit()
+    return {"success": True}
+
 @app.get("/api/history")
 async def get_history(db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(TtsHistory).order_by(TtsHistory.created_at.desc()))
-    history = result.scalars().all()
-    return [
-        {
-            "id": h.id,
-            "text": h.text,
-            "voice": h.voice,
-            "created_at": h.created_at.isoformat()
-        }
-        for h in history
-    ]
+    result = await db.execute(select(TtsHistory).order_by(TtsHistory.created_at.desc()).limit(1))
+    h = result.scalar_one_or_none()
+    if not h:
+        return []
+    return [{
+        "id": h.id,
+        "text": h.text,
+        "voice": h.voice,
+        "created_at": h.created_at.isoformat()
+    }]
 
 @app.get("/api/history/download/{history_id}")
 async def download_history(history_id: int, db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(TtsHistory).where(TtsHistory.id == history_id))
-    item = result.scalar_one_or_none()
-    if not item:
-        raise HTTPException(status_code=404, detail="History item not found")
-
-    filepath = os.path.join(history_dir, item.audio_path)
-    if not os.path.exists(filepath):
-        raise HTTPException(status_code=404, detail="Audio file not found")
-
-    return FileResponse(
-        filepath,
-        media_type="audio/wav",
-        filename=f"tts-history-{history_id}.wav"
-    )
+    # This might need to be reconsidered if we want download to work without reconstruction first.
+    # User said "re-generate the audio and I would listen and download it both option should be available".
+    # History page will trigger reconstruction (TTS) and then download the result.
+    raise HTTPException(status_code=405, detail="Use reconstruction for history download")

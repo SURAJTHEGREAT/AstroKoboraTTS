@@ -89,57 +89,60 @@ export default function Blending() {
 
   if (!isAuthenticated) {
     return (
-      <div className="max-w-md mx-auto mt-20 p-8 bg-white rounded-lg border border-slate-200 shadow-lg">
-        <div className="flex flex-col items-center mb-8">
-          <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mb-4 border border-slate-100">
-            <Lock className="w-8 h-8 text-slate-400" />
+      <div className="flex flex-col h-full items-center justify-center p-8 bg-slate-50 overflow-y-auto w-full">
+        <div className="max-w-md w-full p-8 bg-white rounded-lg border border-slate-200 shadow-lg">
+          <div className="flex flex-col items-center mb-8">
+            <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mb-4 border border-slate-100">
+              <Lock className="w-8 h-8 text-slate-400" />
+            </div>
+            <h2 className="text-[10px] uppercase tracking-[0.2em] font-bold text-slate-500 mb-2">
+              Admin Access Required
+            </h2>
+            <p className="text-slate-600 text-sm mt-2 text-center">
+              Sign in to access voice blending tools.
+            </p>
           </div>
-          <h2 className="text-[10px] uppercase tracking-[0.2em] font-bold text-slate-500 mb-2">
-            Admin Access Required
-          </h2>
-          <p className="text-slate-600 text-sm mt-2 text-center">
-            Sign in to access voice blending tools.
-          </p>
+
+          <form onSubmit={handleLogin} className="space-y-4">
+            <div>
+              <label className="block text-[10px] uppercase tracking-[0.2em] font-bold text-slate-500 mb-2">Username</label>
+              <input
+                type="text"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                className="w-full bg-slate-50 border border-slate-200 rounded px-4 py-3 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-800 text-sm placeholder:text-slate-400 transition-all"
+                placeholder="admin"
+              />
+            </div>
+            <div>
+              <label className="block text-[10px] uppercase tracking-[0.2em] font-bold text-slate-500 mb-2">Password</label>
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="w-full bg-slate-50 border border-slate-200 rounded px-4 py-3 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-800 text-sm placeholder:text-slate-400 transition-all"
+                placeholder="••••••••"
+              />
+            </div>
+
+            {loginError && <p className="text-red-500 text-sm font-medium">{loginError}</p>}
+
+            <button
+              type="submit"
+              className="w-full bg-indigo-600 text-white text-[10px] uppercase font-bold tracking-widest py-3 rounded hover:bg-indigo-700 transition-colors mt-2 shadow-xs"
+            >
+              Authorize Access
+            </button>
+          </form>
         </div>
-
-        <form onSubmit={handleLogin} className="space-y-4">
-          <div>
-            <label className="block text-[10px] uppercase tracking-[0.2em] font-bold text-slate-500 mb-2">Username</label>
-            <input
-              type="text"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              className="w-full bg-slate-50 border border-slate-200 rounded px-4 py-3 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-800 text-sm placeholder:text-slate-400 transition-all"
-              placeholder="admin"
-            />
-          </div>
-          <div>
-            <label className="block text-[10px] uppercase tracking-[0.2em] font-bold text-slate-500 mb-2">Password</label>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full bg-slate-50 border border-slate-200 rounded px-4 py-3 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-800 text-sm placeholder:text-slate-400 transition-all"
-              placeholder="••••••••"
-            />
-          </div>
-
-          {loginError && <p className="text-red-500 text-sm font-medium">{loginError}</p>}
-
-          <button
-            type="submit"
-            className="w-full bg-indigo-600 text-white text-[10px] uppercase font-bold tracking-widest py-3 rounded hover:bg-indigo-700 transition-colors mt-2 shadow-xs"
-          >
-            Authorize Access
-          </button>
-        </form>
       </div>
     );
   }
 
   return (
-    <div className="max-w-2xl mx-auto mt-12 p-8 bg-white rounded-lg border border-slate-200 shadow-md">
-      <div className="flex items-center gap-3 mb-8 pb-6 border-b border-slate-100">
+    <div className="flex flex-col h-full items-center p-8 bg-slate-50 overflow-y-auto w-full">
+      <div className="max-w-2xl w-full p-8 bg-white rounded-lg border border-slate-200 shadow-md mb-8">
+        <div className="flex items-center gap-3 mb-8 pb-6 border-b border-slate-100">
         <Sliders className="w-8 h-8 text-indigo-600" />
         <div>
           <h2 className="text-[10px] uppercase tracking-[0.2em] font-bold text-slate-700 mb-1">Voice Blending Studio</h2>
@@ -249,14 +252,15 @@ export default function Blending() {
         )}
       </div>
 
-      <div className="mt-10 bg-slate-50 rounded-lg p-5 border border-slate-200">
-        <h4 className="text-[10px] font-bold text-slate-500 mb-3 uppercase tracking-[0.2em]">How it works</h4>
-        <p className="text-xs text-slate-600 leading-relaxed">
-          Voice blending performs a mathematical interpolation between two speaker embeddings.
-          A ratio of <strong>0%</strong> creates a voice identical to <strong>Voice A</strong>, while
-          <strong>100%</strong> matches <strong>Voice B</strong>. Values in between create unique
-          hybrid characteristics, allowing for fine-tuned control over tone and personality.
-        </p>
+        <div className="mt-10 bg-slate-50 rounded-lg p-5 border border-slate-200">
+          <h4 className="text-[10px] font-bold text-slate-500 mb-3 uppercase tracking-[0.2em]">How it works</h4>
+          <p className="text-xs text-slate-600 leading-relaxed">
+            Voice blending performs a mathematical interpolation between two speaker embeddings.
+            A ratio of <strong>0%</strong> creates a voice identical to <strong>Voice A</strong>, while
+            <strong>100%</strong> matches <strong>Voice B</strong>. Values in between create unique
+            hybrid characteristics, allowing for fine-tuned control over tone and personality.
+          </p>
+        </div>
       </div>
     </div>
   );

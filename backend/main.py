@@ -7,15 +7,15 @@ from fastapi import FastAPI, Depends, Request, HTTPException, status, UploadFile
 from fastapi.responses import StreamingResponse, FileResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.future import select
-from sqlalchemy import func
+from sqlalchemy import func, select
 from pydantic import BaseModel
 import shutil
 import uuid
 import secrets
 import soundfile as sf
+import numpy as np
 
-from database import init_db, get_db, Voice, ApiClient, ApiClientStat
+from database import init_db, get_db, Voice, ApiClient, ApiClientStat, TtsHistory
 
 # Need to import Kokoro carefully, will mock if not available during early setup
 try:
@@ -33,9 +33,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-data_dir = os.path.join(os.getcwd(), "data")
+data_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "data"))
 models_dir = os.path.join(data_dir, "models")
 os.makedirs(models_dir, exist_ok=True)
+
+history_dir = os.path.join(data_dir, "history_audio")
+os.makedirs(history_dir, exist_ok=True)
 
 temp_dir = os.path.join(os.getcwd(), "temp_kokoro_chunks")
 os.makedirs(temp_dir, exist_ok=True)
@@ -137,6 +140,8 @@ async def tts_endpoint(request: Request, body: TTSRequest, db: AsyncSession = De
     async def event_generator():
         start_time = time.time()
         ttfb_ms = 0
+        all_samples = []
+        sample_rate = 24000 # Default for Kokoro
 
         yield f"data: {json.dumps({'status': 'thinking'})}\n\n"
 
@@ -169,6 +174,9 @@ async def tts_endpoint(request: Request, body: TTSRequest, db: AsyncSession = De
                     lambda: sf.write(filepath, samples, sample_rate)
                 )
 
+                if not client:
+                    all_samples.append(samples)
+
                 if i == 0:
                     ttfb_ms = int((time.time() - start_time) * 1000)
 
@@ -199,6 +207,39 @@ async def tts_endpoint(request: Request, body: TTSRequest, db: AsyncSession = De
             )
             db.add(new_stat)
             await db.commit()
+        else:
+            # Handle History (Web Chat Only)
+            if all_samples:
+                final_audio = np.concatenate(all_samples)
+                history_filename = f"history-{int(time.time())}-{uuid.uuid4().hex[:8]}.wav"
+                history_filepath = os.path.join(history_dir, history_filename)
+
+                await loop.run_in_executor(
+                    None,
+                    lambda: sf.write(history_filepath, final_audio, sample_rate)
+                )
+
+                new_history = TtsHistory(
+                    text=message,
+                    voice=requested_voice,
+                    audio_path=history_filename
+                )
+                db.add(new_history)
+                await db.commit()
+
+                # Maintain last 100 limit
+                result = await db.execute(select(TtsHistory).order_by(TtsHistory.created_at.desc()).offset(100))
+                old_records = result.scalars().all()
+                for old_rec in old_records:
+                    old_path = os.path.join(history_dir, old_rec.audio_path)
+                    if os.path.exists(old_path):
+                        try:
+                            os.remove(old_path)
+                        except OSError:
+                            pass
+                    db.delete(old_rec)
+                if old_records:
+                    await db.commit()
 
         yield f"data: {json.dumps({'status': 'done'})}\n\n"
 
@@ -327,3 +368,34 @@ async def get_voices(request: Request, db: AsyncSession = Depends(get_db)):
         }
         for v in voices
     ]
+
+@app.get("/api/history")
+async def get_history(db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(TtsHistory).order_by(TtsHistory.created_at.desc()))
+    history = result.scalars().all()
+    return [
+        {
+            "id": h.id,
+            "text": h.text,
+            "voice": h.voice,
+            "created_at": h.created_at.isoformat()
+        }
+        for h in history
+    ]
+
+@app.get("/api/history/download/{history_id}")
+async def download_history(history_id: int, db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(TtsHistory).where(TtsHistory.id == history_id))
+    item = result.scalar_one_or_none()
+    if not item:
+        raise HTTPException(status_code=404, detail="History item not found")
+
+    filepath = os.path.join(history_dir, item.audio_path)
+    if not os.path.exists(filepath):
+        raise HTTPException(status_code=404, detail="Audio file not found")
+
+    return FileResponse(
+        filepath,
+        media_type="audio/wav",
+        filename=f"tts-history-{history_id}.wav"
+    )

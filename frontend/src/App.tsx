@@ -3,6 +3,7 @@ import Chat from "./components/Chat";
 import Blending from "./components/Blending";
 import ApiClients from "./components/ApiClients";
 import Analytics from "./components/Analytics";
+import History from "./components/History";
 
 export default function App() {
   return (
@@ -17,6 +18,9 @@ export default function App() {
             <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
             <span className="text-[10px] uppercase font-bold text-green-700 tracking-wider">CPU Engine Active</span>
           </div>
+          <Link to="/history" className="px-5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold uppercase tracking-widest rounded transition-all shadow-sm border border-slate-200">
+            History
+          </Link>
           <Link to="/analytics" className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold uppercase tracking-widest rounded transition-all shadow-sm">
             Analytics
           </Link>
@@ -31,6 +35,7 @@ export default function App() {
       <main className="flex-1 flex overflow-hidden">
         <Routes>
           <Route path="/" element={<Chat />} />
+          <Route path="/history" element={<History />} />
           <Route path="/blend" element={<Blending />} />
           <Route path="/clients" element={<ApiClients />} />
           <Route path="/analytics" element={<Analytics />} />

@@ -16,7 +16,7 @@ describe('Chat Component', () => {
     expect(screen.getByPlaceholderText('Type a prompt for streaming synthesis...')).toBeInTheDocument();
 
     // Verify default voice is selected
-    const voiceSelect = screen.getByLabelText(/Trained Voices:/i) as HTMLSelectElement;
+    const voiceSelect = screen.getByLabelText(/System & Blended:/i) as HTMLSelectElement;
     expect(voiceSelect).toBeInTheDocument();
     expect(voiceSelect.value).toBe('af_heart');
 

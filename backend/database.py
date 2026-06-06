@@ -45,6 +45,14 @@ class ApiClientStat(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     client = relationship("ApiClient", back_populates="stats")
 
+class TtsHistory(Base):
+    __tablename__ = "tts_history"
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    text = Column(Text, nullable=False)
+    voice = Column(String, nullable=False)
+    audio_path = Column(String, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
 async def init_db():
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)

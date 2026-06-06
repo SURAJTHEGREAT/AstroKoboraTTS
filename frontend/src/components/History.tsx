@@ -28,7 +28,7 @@ export default function History() {
 
   const reconstructAudio = async (item: HistoryItem) => {
     setIsReconstructing(true);
-    const reconstructionSessionId = \`history_\${uuidv4()}\`;
+    const reconstructionSessionId = `history_${uuidv4()}`;
     try {
       const response = await fetch("/api/tts", {
         method: "POST",

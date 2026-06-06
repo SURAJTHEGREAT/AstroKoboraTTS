@@ -34,7 +34,19 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-data_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "data"))
+data_dir = os.environ.get("DATA_DIR")
+if not data_dir:
+    cwd_data = os.path.join(os.getcwd(), "data")
+    parent_data = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "data")
+    if os.path.exists(cwd_data):
+        data_dir = os.path.abspath(cwd_data)
+    elif os.path.exists(parent_data):
+        data_dir = os.path.abspath(parent_data)
+    else:
+        data_dir = os.path.abspath(cwd_data)
+else:
+    data_dir = os.path.abspath(data_dir)
+
 models_dir = os.path.join(data_dir, "models")
 os.makedirs(models_dir, exist_ok=True)
 

@@ -40,7 +40,7 @@ sequenceDiagram
     FastAPI->>Kokoro: Load Model (if not loaded) & Stream Text
     Kokoro-->>FastAPI: Yield Audio Chunks
     FastAPI->>FS: Save chunk to temp folder (.wav)
-    FastAPI->>SQLite: Record stats with ttfb_ms (api_client_stats) if authenticated
+    FastAPI->>SQLite: Record stats with ttfb_ms (api_client_stats)
     FastAPI-->>Frontend: SSE: audioUrl (/api/audio/chunk.wav)
     Frontend->>FastAPI: GET /api/audio/chunk.wav
     FastAPI-->>Frontend: Returns audio file

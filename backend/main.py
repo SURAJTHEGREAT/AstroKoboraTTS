@@ -16,7 +16,7 @@ import re
 import soundfile as sf
 import numpy as np
 
-from database import init_db, get_db, Voice, ApiClient, ApiClientStat, TtsHistory
+from database import init_db, get_db, AsyncSessionLocal, Voice, ApiClient, ApiClientStat, TtsHistory
 
 # Need to import Kokoro carefully, will mock if not available during early setup
 try:
@@ -64,6 +64,19 @@ kokoro_model: Optional[Any] = None
 @app.on_event("startup")
 async def startup_event():
     await init_db()
+
+    # Ensure "direct" client exists for tracking web interface analytics
+    async with AsyncSessionLocal() as db:
+        result = await db.execute(select(ApiClient).where(ApiClient.client_id == "direct"))
+        if not result.scalar_one_or_none():
+            direct_client = ApiClient(
+                client_name="direct",
+                client_id="direct",
+                client_secret=secrets.token_hex(32)
+            )
+            db.add(direct_client)
+            await db.commit()
+            print("Initialized 'direct' API client for web analytics.")
 
     # Clear session audio on startup
     if os.path.exists(session_audio_dir):
@@ -239,14 +252,14 @@ async def tts_endpoint(request: Request, body: TTSRequest, db: AsyncSession = De
                 return
 
         # Track stats
-        if client:
-            new_stat = ApiClientStat(
-                client_id=client.client_id,
-                words_processed=words_processed,
-                ttfb_ms=ttfb_ms
-            )
-            db.add(new_stat)
-            await db.commit()
+        tracking_client_id = client.client_id if client else "direct"
+        new_stat = ApiClientStat(
+            client_id=tracking_client_id,
+            words_processed=words_processed,
+            ttfb_ms=ttfb_ms
+        )
+        db.add(new_stat)
+        await db.commit()
 
         if not interrupted:
             # Save session audio

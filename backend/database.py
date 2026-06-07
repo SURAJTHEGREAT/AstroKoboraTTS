@@ -1,7 +1,7 @@
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 from sqlalchemy.orm import declarative_base, relationship, Mapped, mapped_column
 from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Text, Float, Boolean
-from datetime import datetime
+from datetime import datetime, timezone
 import os
 
 data_dir = os.environ.get("DATA_DIR")
@@ -37,7 +37,7 @@ class Voice(Base):
     ratio = Column(Float, nullable=True, default=0.5)
     file_path = Column(String, nullable=True)
     original_filename = Column(String, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
 
 class ApiClient(Base):
     __tablename__ = "api_clients"
@@ -45,7 +45,7 @@ class ApiClient(Base):
     client_name = Column(String, nullable=False)
     client_id = Column(String, nullable=False, unique=True, index=True)
     client_secret = Column(String, nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
     stats = relationship("ApiClientStat", back_populates="client")
 
 class ApiClientStat(Base):
@@ -54,7 +54,7 @@ class ApiClientStat(Base):
     client_id = Column(String, ForeignKey("api_clients.client_id"), nullable=False)
     words_processed = Column(Integer, nullable=False)
     ttfb_ms = Column(Integer, nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
     client = relationship("ApiClient", back_populates="stats")
 
 class TtsHistory(Base):
@@ -63,7 +63,7 @@ class TtsHistory(Base):
     text = Column(Text, nullable=False)
     voice = Column(String, nullable=False)
     audio_path = Column(String, nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
 
 async def init_db():
     async with engine.begin() as conn:

@@ -407,7 +407,7 @@ async def get_voices(request: Request, db: AsyncSession = Depends(get_db)):
             "voice_name": v.voice_name,
             "file_path": v.file_path,
             "original_filename": v.original_filename,
-            "created_at": v.created_at.isoformat()
+            "created_at": v.created_at.isoformat() + "Z"
         }
         for v in voices
     ]
@@ -474,7 +474,7 @@ async def get_history(db: AsyncSession = Depends(get_db)):
         "text": h.text,
         "voice": h.voice,
         "audio_url": f"/api/history/audio/{h.audio_path}",
-        "created_at": h.created_at.isoformat()
+        "created_at": h.created_at.isoformat() + "Z"
     } for h in records]
 
 @app.get("/api/history/audio/{filename}")

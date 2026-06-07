@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router';
 import Chat from '../src/components/Chat';
@@ -6,6 +6,12 @@ import { vi, describe, it, expect, beforeEach } from 'vitest';
 
 // Mock fetch for API calls
 global.fetch = vi.fn();
+
+const ChatTestWrapper = () => {
+  const [messages, setMessages] = useState<any[]>([]);
+  const [input, setInput] = useState("");
+  return <Chat sessionId="test-session" messages={messages} setMessages={setMessages} input={input} setInput={setInput} />;
+};
 
 describe('Chat Component - Apply Button', () => {
   beforeEach(() => {
@@ -17,23 +23,33 @@ describe('Chat Component - Apply Button', () => {
           json: () => Promise.resolve([]),
         });
       }
-      return Promise.resolve({
-        ok: true,
-        body: {
-          getReader: () => ({
-            read: vi.fn()
-              .mockResolvedValueOnce({ value: new TextEncoder().encode('data: {"status": "text", "text": "Hello world"}\n\n'), done: false })
-              .mockResolvedValueOnce({ value: undefined, done: true }),
-          }),
-        },
-      });
+      if (url === '/api/tts') {
+        return Promise.resolve({
+          ok: true,
+          body: {
+            getReader: () => {
+              let count = 0;
+              return {
+                read: async () => {
+                  if (count === 0) {
+                    count++;
+                    return { value: new TextEncoder().encode('data: {"status": "text", "text": "Hello world"}\n\ndata: {"status": "finished", "audioUrl": "dummy.wav"}\n\n'), done: false };
+                  }
+                  return { value: undefined, done: true };
+                }
+              };
+            },
+          },
+        });
+      }
+      return Promise.resolve({ ok: true });
     });
   });
 
   it('shows Apply button on assistant messages and toggles disabled state based on input', async () => {
     render(
       <MemoryRouter>
-        <Chat />
+        <ChatTestWrapper />
       </MemoryRouter>
     );
 
@@ -44,7 +60,7 @@ describe('Chat Component - Apply Button', () => {
     fireEvent.change(input, { target: { value: 'Hello' } });
     fireEvent.click(sendButton);
 
-    // Wait for the message to appear
+    // Wait for the message to appear and finish
     const applyButton = await screen.findByText('APPLY');
     expect(applyButton).toBeInTheDocument();
 

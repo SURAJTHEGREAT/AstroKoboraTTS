@@ -432,11 +432,11 @@ export default function Chat({ sessionId, messages, setMessages, input, setInput
 
                         <button
                           onClick={() => handleSaveHistory(msg.content, msg.voice || selectedVoice, msg.id)}
-                          disabled={isGenerating || msg.isSaved}
+                          disabled={isGenerating || msg.isSaved || msg.status !== "finished"}
                           className={`flex items-center gap-1.5 px-6 py-2 rounded-full text-[11px] font-bold transition-all shadow-md active:scale-95 ${
                             msg.isSaved
                               ? "bg-slate-100 border border-slate-200 text-slate-400 cursor-not-allowed"
-                              : "bg-white border-2 border-emerald-500 text-emerald-600 hover:bg-emerald-50"
+                              : "bg-white border-2 border-emerald-500 text-emerald-600 hover:bg-emerald-50 disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:border-slate-200 disabled:text-slate-400"
                           }`}
                         >
                           <Save size={12} /> {msg.isSaved ? "SAVED" : "SAVE"}

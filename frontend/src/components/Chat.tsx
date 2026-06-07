@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useMemo } from "react";
-import { Mic, Send, Loader2, Volume2, User, Bot, Globe, Sparkles, Square, Save, CircleOff } from "lucide-react";
+import { Mic, Send, Loader2, Volume2, User, Bot, Globe, Sparkles, Square, Save, CircleOff, ChevronUp } from "lucide-react";
 import { Link } from "react-router";
 import { v4 as uuidv4 } from 'uuid';
 
@@ -81,7 +81,9 @@ export default function Chat({ sessionId, messages, setMessages, input, setInput
   const playNextAudio = async () => {
     if (audioQueue.current.length === 0) {
       isPlaying.current = false;
-      setCurrentlyPlayingId(null);
+      if (!isGenerating) {
+        setCurrentlyPlayingId(null);
+      }
       return;
     }
 
@@ -144,6 +146,7 @@ export default function Chat({ sessionId, messages, setMessages, input, setInput
     audioQueue.current = [];
     isPlaying.current = false;
     setIsGenerating(false);
+    setCurrentlyPlayingId(null);
 
     // Mark last assistant message as interrupted
     setMessages(prev => {
@@ -158,6 +161,7 @@ export default function Chat({ sessionId, messages, setMessages, input, setInput
   const generateTTS = async (text: string, voice: string) => {
     const messageId = uuidv4();
     setIsGenerating(true);
+    setCurrentlyPlayingId(messageId);
     setCurrentResponse("");
     abortController.current = new AbortController();
 
@@ -247,6 +251,9 @@ export default function Chat({ sessionId, messages, setMessages, input, setInput
       }
     } finally {
       setIsGenerating(false);
+      if (audioQueue.current.length === 0 && !isPlaying.current) {
+        setCurrentlyPlayingId(null);
+      }
       setCurrentResponse("");
       abortController.current = null;
     }
@@ -305,6 +312,17 @@ export default function Chat({ sessionId, messages, setMessages, input, setInput
     setCurrentlyPlayingId(id);
     audioQueue.current = [url];
     playNextAudio();
+  };
+
+  const activeMessageId = currentlyPlayingId;
+
+  const scrollToActiveMessage = () => {
+    if (activeMessageId) {
+      const element = document.getElementById(`msg-${activeMessageId}`);
+      if (element) {
+        element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    }
   };
 
   const currentVoiceObj = 
@@ -396,7 +414,7 @@ export default function Chat({ sessionId, messages, setMessages, input, setInput
           messages.map((msg, idx) => {
             const isLastMessage = idx === messages.length - 1;
             return (
-              <div key={msg.id} className={`flex gap-4 ${msg.role === "user" ? "flex-row-reverse" : ""}`}>
+              <div key={msg.id} id={`msg-${msg.id}`} className={`flex gap-4 ${msg.role === "user" ? "flex-row-reverse" : ""}`}>
                 <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${msg.role === "user" ? "bg-slate-200 text-slate-700" : "bg-indigo-600 text-white shadow-xs"}`}>
                   {msg.role === "user" ? "US" : "TTS"}
                 </div>
@@ -490,8 +508,8 @@ export default function Chat({ sessionId, messages, setMessages, input, setInput
         )}
       </div>
 
-      <div className="p-6 border-t border-slate-200 bg-white">
-        <form onSubmit={handleSubmit} className="relative flex items-center w-full">
+      <div className="p-6 border-t border-slate-200 bg-white flex items-center gap-4">
+        <form onSubmit={handleSubmit} className="relative flex items-center flex-1">
           <input
             type="text"
             value={input}
@@ -521,6 +539,15 @@ export default function Chat({ sessionId, messages, setMessages, input, setInput
             )}
           </div>
         </form>
+        {activeMessageId && (
+          <button
+            onClick={scrollToActiveMessage}
+            className="p-3 bg-white border border-slate-200 rounded-full hover:bg-slate-50 transition-all shadow-sm text-blue-600 active:scale-95"
+            title="Go to active message"
+          >
+            <ChevronUp size={24} />
+          </button>
+        )}
       </div>
     </div>
   );

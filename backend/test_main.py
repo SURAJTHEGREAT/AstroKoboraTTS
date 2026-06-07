@@ -28,6 +28,57 @@ app.dependency_overrides[get_db] = override_get_db
 
 client = TestClient(app)
 
+@pytest.mark.asyncio
+async def test_direct_analytics():
+    # 1. Trigger a direct TTS request (no auth headers)
+    # We need to mock kokoro_model so it doesn't fail if model files are missing
+    import main
+    from unittest.mock import MagicMock
+    from database import ApiClient
+    from sqlalchemy import select
+
+    # We need to manually initialize the "direct" client since startup_event
+    # might not run or use the right DB in TestClient setup sometimes depending on how it's called
+    async with TestingSessionLocal() as db:
+        result = await db.execute(select(ApiClient).where(ApiClient.client_id == "direct"))
+        if not result.scalar_one_or_none():
+            direct_client = ApiClient(
+                client_name="direct",
+                client_id="direct",
+                client_secret="test_secret"
+            )
+            db.add(direct_client)
+            await db.commit()
+
+    original_model = main.kokoro_model
+    main.kokoro_model = MagicMock()
+    main.kokoro_model.create.return_value = ([0.1, 0.2], 24000)
+
+    try:
+        # We use a short message to avoid too many chunks
+        response = client.post("/api/tts", json={"message": "Hello", "voice": "af_heart"})
+        assert response.status_code == 200
+        # Consume the stream to trigger tracking
+        for _ in response.iter_lines():
+            pass
+
+        # 2. Check analytics
+        analytics_data = {
+            "username": "admin",
+            "password": "password"
+        }
+        response = client.post("/api/analytics", json=analytics_data)
+        assert response.status_code == 200
+        stats = response.json()
+
+        # Should find a client named "direct"
+        direct_stats = next((s for s in stats if s["client_name"] == "direct"), None)
+        assert direct_stats is not None
+        assert direct_stats["total_files_generated"] >= 1
+        assert direct_stats["total_words_processed"] == 1
+    finally:
+        main.kokoro_model = original_model
+
 def test_read_voices():
     response = client.get("/api/voices")
     assert response.status_code == 200

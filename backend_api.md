@@ -95,7 +95,7 @@ You can then download the generated audio chunk by navigating to `http://localho
 
 ### 3. Fetching Analytics Data
 
-The `/api/analytics` endpoint provides access to TTS usage statistics (words processed, average time taken) aggregated by API client.
+The `/api/analytics` endpoint provides access to TTS usage statistics (total files generated, words processed, average time to first byte) aggregated by API client.
 
 **Endpoint:** `POST /api/analytics`
 **Content-Type:** `application/json`
@@ -118,8 +118,9 @@ curl -X POST http://localhost:8000/api/analytics \
 [
   {
     "client_name": "Test Client",
+    "total_files_generated": 25,
     "total_words_processed": 1500,
-    "avg_time_taken_ms": 2540
+    "avg_ttfb_ms": 2540
   }
 ]
 ```

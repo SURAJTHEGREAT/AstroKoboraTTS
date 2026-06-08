@@ -1,6 +1,7 @@
 import { Routes, Route, Link } from "react-router";
-import { useState, useMemo } from "react";
+import { useState } from "react";
 import { v4 as uuidv4 } from 'uuid';
+import { Plus } from "lucide-react";
 import Chat from "./components/Chat";
 import Blending from "./components/Blending";
 import ApiClients from "./components/ApiClients";
@@ -18,9 +19,14 @@ type Message = {
 };
 
 export default function App() {
-  const sessionId = useMemo(() => uuidv4(), []);
+  const [sessionId, setSessionId] = useState(() => uuidv4());
   const [messages, setMessages] = useState<Message[]>([]);
   const [chatInput, setChatInput] = useState("");
+
+  const handleClearChat = () => {
+    setMessages([]);
+    setSessionId(uuidv4());
+  };
 
   return (
     <div className="flex flex-col h-screen w-full bg-slate-50 text-slate-800 font-sans">
@@ -46,6 +52,13 @@ export default function App() {
           <Link to="/blend" className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold uppercase tracking-widest rounded transition-all shadow-sm">
             Blend Voices
           </Link>
+          <button
+            onClick={handleClearChat}
+            title="Start new chat"
+            className="w-8 h-8 flex items-center justify-center bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-full transition-all shadow-sm border border-slate-200 ml-2"
+          >
+            <Plus size={18} />
+          </button>
         </div>
       </header>
       <main className="flex-1 flex overflow-hidden">

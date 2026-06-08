@@ -51,7 +51,7 @@ export default function Chat({ sessionId, messages, setMessages, input, setInput
   const [currentlyPlayingId, setCurrentlyPlayingId] = useState<string | null>(null);
   
   // Audio playback queue
-  const audioQueue = useRef<string[]>([]);
+  const audioQueue = useRef<{ url: string; id: string }[]>([]);
   const isPlaying = useRef(false);
   const audioContext = useRef<AudioContext | null>(null);
   const activeSource = useRef<AudioBufferSourceNode | null>(null);
@@ -79,18 +79,15 @@ export default function Chat({ sessionId, messages, setMessages, input, setInput
   }, []);
 
   const playNextAudio = async () => {
-    if (audioQueue.current.length === 0) {
+    const item = audioQueue.current.shift();
+    if (!item) {
       isPlaying.current = false;
       setCurrentlyPlayingId(null);
       return;
     }
 
     isPlaying.current = true;
-    const audioUrl = audioQueue.current.shift();
-    if (!audioUrl) {
-      playNextAudio();
-      return;
-    }
+    setCurrentlyPlayingId(item.id);
 
     try {
       if (!audioContext.current) {
@@ -98,7 +95,7 @@ export default function Chat({ sessionId, messages, setMessages, input, setInput
       }
 
       // Fetch array buffer from URL
-      const res = await fetch(audioUrl);
+      const res = await fetch(item.url);
       const arrayBuffer = await res.arrayBuffer();
       
       const audioBuffer = await audioContext.current.decodeAudioData(arrayBuffer);
@@ -121,14 +118,16 @@ export default function Chat({ sessionId, messages, setMessages, input, setInput
     }
   };
 
-  const enqueueAudio = (base64Audio: string) => {
-    audioQueue.current.push(base64Audio);
+  const enqueueAudio = (url: string, id: string) => {
+    audioQueue.current.push({ url, id });
     if (!isPlaying.current) {
       playNextAudio();
     }
   };
 
   const handleStop = () => {
+    const messageToInterrupt = currentlyPlayingId;
+
     if (abortController.current) {
       abortController.current.abort();
       abortController.current = null;
@@ -144,20 +143,31 @@ export default function Chat({ sessionId, messages, setMessages, input, setInput
     audioQueue.current = [];
     isPlaying.current = false;
     setIsGenerating(false);
+    setCurrentlyPlayingId(null);
 
-    // Mark last assistant message as interrupted
-    setMessages(prev => {
-      const last = prev[prev.length - 1];
-      if (last && last.role === "assistant" && last.status === "generating") {
-        return [...prev.slice(0, -1), { ...last, status: "interrupted" }];
-      }
-      return prev;
-    });
+    // Mark the message that was generating as interrupted
+    if (messageToInterrupt) {
+      setMessages(prev => prev.map(m =>
+        (m.id === messageToInterrupt && m.status === "generating")
+          ? { ...m, status: "interrupted" }
+          : m
+      ));
+    } else {
+       // Fallback for safety if ID wasn't set yet but we were generating
+       setMessages(prev => {
+        const last = prev[prev.length - 1];
+        if (last && last.role === "assistant" && last.status === "generating") {
+          return [...prev.slice(0, -1), { ...last, status: "interrupted" }];
+        }
+        return prev;
+      });
+    }
   };
 
   const generateTTS = async (text: string, voice: string) => {
     const messageId = uuidv4();
     setIsGenerating(true);
+    setCurrentlyPlayingId(messageId);
     setCurrentResponse("");
     abortController.current = new AbortController();
 
@@ -221,7 +231,7 @@ export default function Chat({ sessionId, messages, setMessages, input, setInput
                     m.id === messageId ? { ...m, content: accumulatedText } : m
                   ));
                 } else if (data.status === "audio" && data.audioUrl) {
-                  enqueueAudio(data.audioUrl);
+                  enqueueAudio(data.audioUrl, messageId);
                 } else if (data.status === "done" && data.audioUrl) {
                    // This is the final concatenated URL
                    setMessages(prev => prev.map(m =>
@@ -303,7 +313,7 @@ export default function Chat({ sessionId, messages, setMessages, input, setInput
     }
 
     setCurrentlyPlayingId(id);
-    audioQueue.current = [url];
+    audioQueue.current = [{ url, id }];
     playNextAudio();
   };
 
@@ -501,7 +511,7 @@ export default function Chat({ sessionId, messages, setMessages, input, setInput
             className="w-full bg-slate-50 border border-slate-200 rounded-full py-4 px-6 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all pr-16 text-slate-800 placeholder:text-slate-400 disabled:opacity-50"
           />
           <div className="absolute right-2">
-            {isGenerating ? (
+            {isGenerating || currentlyPlayingId ? (
               <button
                 type="button"
                 onClick={handleStop}

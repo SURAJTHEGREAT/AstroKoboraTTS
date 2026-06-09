@@ -18,32 +18,28 @@ If you start the backend with `API_ONLY=true`, then `x-client-id` and `x-client-
 
 ## Core API Endpoints
 
-### 1. Training / Uploading a Custom Voice Sample
+### 1. Blending Custom Voices
 
-The `/api/train` endpoint accepts a single `.wav` file as a sample. It creates voice embeddings which can be used for text-to-speech.
+The `/api/blend` endpoint allows you to blend two existing voices to create a new one.
 
-**Endpoint:** `POST /api/train`
-**Content-Type:** `multipart/form-data`
+**Endpoint:** `POST /api/blend`
+**Content-Type:** `application/json`
 
-**Parameters:**
-- `username` (text): Admin username (default: `admin`)
-- `password` (text): Admin password (default: `password`)
-- `voiceName` (text): The name to assign to this custom voice embedding.
-- `sample` (file): The `.wav` or audio sample file.
+**Parameters (JSON Body):**
+- `username` (string): Admin username (default: `admin`)
+- `password` (string): Admin password (default: `password`)
+- `voice_name` (string): The name to assign to this blended voice.
+- `voice_a` (string): The first voice to blend.
+- `voice_b` (string): The second voice to blend.
+- `ratio` (number): The blend ratio (0 to 1).
 
 #### Example using `curl`:
 
 ```bash
-# Create a dummy test file
-echo "dummy audio content" > sample_voice.wav
-
-# Upload the sample voice to create a new embedding named "my_custom_voice"
-curl -X POST http://localhost:8000/api/train \
-  -H "Accept: application/json" \
-  -F "username=admin" \
-  -F "password=password" \
-  -F "voiceName=my_custom_voice" \
-  -F "sample=@sample_voice.wav"
+# Blend voices to create a new embedding named "my_blended_voice"
+curl -X POST http://localhost:8000/api/blend \
+  -H "Content-Type: application/json" \
+  -d '{"username": "admin", "password": "password", "voice_name": "my_blended_voice", "voice_a": "af_heart", "voice_b": "am_adam", "ratio": 0.5}'
 ```
 
 **Expected Response:**
@@ -51,8 +47,8 @@ curl -X POST http://localhost:8000/api/train \
 ```json
 {
   "success": true,
-  "message": "Voice embedding trained successfully",
-  "voiceName": "my_custom_voice"
+  "message": "Voice blended successfully",
+  "voice_name": "my_blended_voice"
 }
 ```
 

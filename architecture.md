@@ -6,6 +6,8 @@ This document provides a detailed overview of the application architecture, expl
 
 The application is built using a modern architecture, featuring a React frontend and a Python FastAPI backend, and leverages `kokoro-onnx` to perform local, in-memory Text-to-Speech (TTS) generation using an ONNX model. The backend also supports an admin feature to simulate voice model training and save custom voice recordings with SQLite as a metadata store.
 
+![Anatomy of Local Speech Pipeline](images/anatomy_of_local_speech_pipeline.png)
+
 ### Components
 
 1. **Frontend (React)**:

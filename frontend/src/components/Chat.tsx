@@ -324,7 +324,7 @@ export default function Chat({ sessionId, messages, setMessages, input, setInput
       name: customVoices.find(v => v.voice_name === selectedVoice).voice_name,
       gender: "Custom",
       region: "Local",
-      desc: "Custom trained voice embedding"
+      desc: "Custom blended voice embedding"
     } : undefined);
 
   return (

@@ -14,3 +14,4 @@ coverage/
 # Test reports
 html/
 __pycache__/
+backend/temp_kokoro_chunks/

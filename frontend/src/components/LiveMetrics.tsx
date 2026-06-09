@@ -92,19 +92,24 @@ export default function LiveMetrics({ messages }: LiveMetricsProps) {
             </h3>
             <div className="h-80 w-full">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={avgRamData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
-                          onClick={(data) => {
-                            if (data && data.activePayload && data.activePayload.length > 0) {
-                              setSelectedMessageId(data.activePayload[0].payload.id);
-                            }
-                          }}>
+                <BarChart data={avgRamData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
                   <XAxis dataKey="name" tick={{fill: '#64748b', fontSize: 12}} tickLine={false} axisLine={false} />
                   <YAxis tick={{fill: '#64748b', fontSize: 12}} tickLine={false} axisLine={false}>
                      <Label value="Avg RAM (MB)" angle={-90} position="insideLeft" style={{ textAnchor: 'middle', fill: '#64748b', fontSize: 12 }} />
                   </YAxis>
                   <Tooltip content={<CustomTooltipMain />} cursor={{fill: '#f1f5f9'}} />
-                  <Bar dataKey="avgRam" fill="#4f46e5" radius={[4, 4, 0, 0]} className="cursor-pointer hover:opacity-80 transition-opacity" />
+                  <Bar
+                    dataKey="avgRam"
+                    fill="#4f46e5"
+                    radius={[4, 4, 0, 0]}
+                    className="cursor-pointer hover:opacity-80 transition-opacity"
+                    onClick={(data) => {
+                      if (data && data.id) {
+                        setSelectedMessageId(data.id);
+                      }
+                    }}
+                  />
                 </BarChart>
               </ResponsiveContainer>
             </div>

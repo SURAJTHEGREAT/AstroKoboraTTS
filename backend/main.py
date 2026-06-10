@@ -15,6 +15,7 @@ import secrets
 import re
 import soundfile as sf
 import numpy as np
+import psutil
 
 from database import init_db, get_db, AsyncSessionLocal, Voice, ApiClient, ApiClientStat, TtsHistory
 
@@ -235,7 +236,10 @@ async def tts_endpoint(request: Request, body: TTSRequest, db: AsyncSession = De
 
                 print(f"[Chunk {i}] Processing text: '{text_chunk}'")
 
-                yield f"data: {json.dumps({'status': 'audio', 'text': text_chunk, 'audioUrl': f'/api/audio/{filename}'})}\n\n"
+                process = psutil.Process(os.getpid())
+                ram_usage_mb = process.memory_info().rss / (1024 * 1024)
+
+                yield f"data: {json.dumps({'status': 'audio', 'text': text_chunk, 'audioUrl': f'/api/audio/{filename}', 'ramUsageMb': round(ram_usage_mb, 2)})}\n\n"
 
                 # Cleanup task (fire and forget)
                 async def delete_later(path):

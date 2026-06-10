@@ -11,6 +11,8 @@ type Message = {
   status?: "generating" | "finished" | "interrupted";
   audioUrl?: string;
   isSaved?: boolean;
+  ramMetrics?: { chunk: string; ramUsageMb: number }[];
+  totalWords?: number;
 };
 
 interface ChatProps {
@@ -172,12 +174,16 @@ export default function Chat({ sessionId, messages, setMessages, input, setInput
     abortController.current = new AbortController();
 
     // Add initial empty assistant message
+    const totalWords = text.trim().split(/\s+/).length;
+
     setMessages(prev => [...prev, {
       id: messageId,
       role: "assistant",
       content: "",
       voice: voice,
-      status: "generating"
+      status: "generating",
+      ramMetrics: [],
+      totalWords: totalWords
     }]);
 
     let accumulatedText = "";
@@ -232,6 +238,17 @@ export default function Chat({ sessionId, messages, setMessages, input, setInput
                   ));
                 } else if (data.status === "audio" && data.audioUrl) {
                   enqueueAudio(data.audioUrl, messageId);
+                  if (data.ramUsageMb) {
+                    setMessages(prev => prev.map(m => {
+                      if (m.id === messageId) {
+                        return {
+                          ...m,
+                          ramMetrics: [...(m.ramMetrics || []), { chunk: data.text, ramUsageMb: data.ramUsageMb }]
+                        };
+                      }
+                      return m;
+                    }));
+                  }
                 } else if (data.status === "done" && data.audioUrl) {
                    // This is the final concatenated URL
                    setMessages(prev => prev.map(m =>

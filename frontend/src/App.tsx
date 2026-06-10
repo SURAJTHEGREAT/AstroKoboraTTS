@@ -7,6 +7,7 @@ import Blending from "./components/Blending";
 import ApiClients from "./components/ApiClients";
 import Analytics from "./components/Analytics";
 import History from "./components/History";
+import LiveMetrics from "./components/LiveMetrics";
 
 type Message = {
   id: string;
@@ -16,6 +17,8 @@ type Message = {
   status?: "generating" | "finished" | "interrupted";
   audioUrl?: string;
   isSaved?: boolean;
+  ramMetrics?: { chunk: string; ramUsageMb: number }[];
+  totalWords?: number;
 };
 
 export default function App() {
@@ -43,6 +46,9 @@ export default function App() {
           <Link to="/history" className="px-5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold uppercase tracking-widest rounded transition-all shadow-sm border border-slate-200">
             History
           </Link>
+          <Link to="/live-metrics" className="px-5 py-2 bg-blue-100 hover:bg-blue-200 text-blue-700 text-xs font-bold uppercase tracking-widest rounded transition-all shadow-sm border border-blue-200">
+            Live Metrics
+          </Link>
           <Link to="/analytics" className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold uppercase tracking-widest rounded transition-all shadow-sm">
             Analytics
           </Link>
@@ -65,6 +71,7 @@ export default function App() {
         <Routes>
           <Route path="/" element={<Chat sessionId={sessionId} messages={messages} setMessages={setMessages} input={chatInput} setInput={setChatInput} />} />
           <Route path="/history" element={<History />} />
+          <Route path="/live-metrics" element={<LiveMetrics messages={messages} />} />
           <Route path="/blend" element={<Blending />} />
           <Route path="/clients" element={<ApiClients />} />
           <Route path="/analytics" element={<Analytics />} />

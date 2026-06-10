@@ -19,6 +19,7 @@ type Message = {
   isSaved?: boolean;
   ramMetrics?: { chunk: string; ramUsageMb: number }[];
   totalWords?: number;
+  tagName?: string;
 };
 
 export default function App() {

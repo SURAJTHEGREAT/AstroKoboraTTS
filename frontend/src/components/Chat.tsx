@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect, useMemo } from "react";
 import { Mic, Send, Loader2, Volume2, User, Bot, Globe, Sparkles, Square, Save, CircleOff } from "lucide-react";
 import { Link } from "react-router";
 import { v4 as uuidv4 } from 'uuid';
+import { generateRandomName } from "../utils/nameGenerator";
 
 type Message = {
   id: string;
@@ -13,6 +14,7 @@ type Message = {
   isSaved?: boolean;
   ramMetrics?: { chunk: string; ramUsageMb: number }[];
   totalWords?: number;
+  tagName?: string;
 };
 
 interface ChatProps {
@@ -175,6 +177,7 @@ export default function Chat({ sessionId, messages, setMessages, input, setInput
 
     // Add initial empty assistant message
     const totalWords = text.trim().split(/\s+/).length;
+    const tagName = generateRandomName();
 
     setMessages(prev => [...prev, {
       id: messageId,
@@ -183,7 +186,8 @@ export default function Chat({ sessionId, messages, setMessages, input, setInput
       voice: voice,
       status: "generating",
       ramMetrics: [],
-      totalWords: totalWords
+      totalWords: totalWords,
+      tagName: tagName
     }]);
 
     let accumulatedText = "";
@@ -424,8 +428,12 @@ export default function Chat({ sessionId, messages, setMessages, input, setInput
             const isLastMessage = idx === messages.length - 1;
             return (
               <div key={msg.id} className={`flex gap-4 ${msg.role === "user" ? "flex-row-reverse" : ""}`}>
-                <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${msg.role === "user" ? "bg-slate-200 text-slate-700" : "bg-indigo-600 text-white shadow-xs"}`}>
-                  {msg.role === "user" ? "US" : "TTS"}
+                <div className={`flex-shrink-0 flex items-center justify-center text-xs font-bold ${
+                  msg.role === "user"
+                    ? "w-8 h-8 rounded-full bg-slate-200 text-slate-700"
+                    : "h-8 px-3 rounded-full bg-indigo-600 text-white shadow-xs"
+                }`}>
+                  {msg.role === "user" ? "US" : (msg.tagName || "TTS")}
                 </div>
                 <div className={`p-4 max-w-lg ${msg.role === "user" ? "bg-slate-100 border border-slate-200/60 rounded-2xl rounded-tr-none" : "bg-indigo-50 border border-indigo-100 rounded-2xl rounded-tl-none"}`}>
                   <p className="text-sm leading-relaxed text-slate-800 whitespace-pre-wrap">

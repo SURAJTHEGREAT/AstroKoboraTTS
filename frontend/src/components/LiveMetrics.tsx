@@ -27,7 +27,7 @@ export default function LiveMetrics({ messages }: LiveMetricsProps) {
     const avgRam = msg.ramMetrics!.reduce((acc, curr) => acc + curr.ramUsageMb, 0) / msg.ramMetrics!.length;
     return {
       id: msg.id,
-      name: `Msg ${index + 1}`,
+      name: msg.tagName || `Msg ${index + 1}`,
       avgRam: Math.round(avgRam * 10) / 10,
       totalWords: msg.totalWords || 0,
       contentPreview: msg.content.substring(0, 30) + '...'

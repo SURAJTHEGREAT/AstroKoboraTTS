@@ -12,6 +12,7 @@ type Message = {
   isSaved?: boolean;
   ramMetrics?: { chunk: string; ramUsageMb: number }[];
   totalWords?: number;
+  ttfbMs?: number;
 };
 
 interface LiveMetricsProps {
@@ -30,6 +31,7 @@ export default function LiveMetrics({ messages }: LiveMetricsProps) {
       name: msg.tagName || `Msg ${index + 1}`,
       avgRam: Math.round(avgRam * 10) / 10,
       totalWords: msg.totalWords || 0,
+      ttfbMs: msg.ttfbMs,
       contentPreview: msg.content.substring(0, 30) + '...'
     };
   });
@@ -43,6 +45,9 @@ export default function LiveMetrics({ messages }: LiveMetricsProps) {
           <p className="font-bold text-slate-800 mb-1">{label}</p>
           <p className="text-slate-600">Avg RAM: <span className="font-semibold text-indigo-600">{payload[0].value} MB</span></p>
           <p className="text-slate-600">Words: <span className="font-semibold text-slate-800">{payload[0].payload.totalWords}</span></p>
+          {payload[0].payload.ttfbMs !== undefined && (
+            <p className="text-slate-600">TTFB: <span className="font-semibold text-slate-800">{payload[0].payload.ttfbMs} ms</span></p>
+          )}
           <p className="text-slate-500 italic mt-1 max-w-[200px] truncate">{payload[0].payload.contentPreview}</p>
         </div>
       );

@@ -20,6 +20,7 @@ type Message = {
   ramMetrics?: { chunk: string; ramUsageMb: number }[];
   totalWords?: number;
   tagName?: string;
+  ttfbMs?: number;
 };
 
 export default function App() {

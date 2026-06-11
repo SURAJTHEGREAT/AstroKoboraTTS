@@ -15,3 +15,4 @@ coverage/
 html/
 __pycache__/
 backend/temp_kokoro_chunks/
+venv

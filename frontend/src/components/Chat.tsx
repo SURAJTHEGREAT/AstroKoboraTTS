@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useMemo } from "react";
-import { Mic, Send, Loader2, Volume2, User, Bot, Globe, Sparkles, Square, Save, CircleOff } from "lucide-react";
+import { Mic, Send, Loader2, Volume2, User, Bot, Globe, Sparkles, Square, Save, CircleOff, ChevronUp } from "lucide-react";
 import { Link } from "react-router";
 import { v4 as uuidv4 } from 'uuid';
 import { generateRandomName } from "../utils/nameGenerator";
@@ -86,7 +86,9 @@ export default function Chat({ sessionId, messages, setMessages, input, setInput
     const item = audioQueue.current.shift();
     if (!item) {
       isPlaying.current = false;
-      setCurrentlyPlayingId(null);
+      if (!isGenerating) {
+        setCurrentlyPlayingId(null);
+      }
       return;
     }
 
@@ -149,23 +151,14 @@ export default function Chat({ sessionId, messages, setMessages, input, setInput
     setIsGenerating(false);
     setCurrentlyPlayingId(null);
 
-    // Mark the message that was generating as interrupted
-    if (messageToInterrupt) {
-      setMessages(prev => prev.map(m =>
-        (m.id === messageToInterrupt && m.status === "generating")
-          ? { ...m, status: "interrupted" }
-          : m
-      ));
-    } else {
-       // Fallback for safety if ID wasn't set yet but we were generating
-       setMessages(prev => {
-        const last = prev[prev.length - 1];
-        if (last && last.role === "assistant" && last.status === "generating") {
-          return [...prev.slice(0, -1), { ...last, status: "interrupted" }];
-        }
-        return prev;
-      });
-    }
+    // Mark last assistant message as interrupted
+    setMessages(prev => {
+      const last = prev[prev.length - 1];
+      if (last && last.role === "assistant" && last.status === "generating") {
+        return [...prev.slice(0, -1), { ...last, status: "interrupted" }];
+      }
+      return prev;
+    });
   };
 
   const generateTTS = async (text: string, voice: string) => {
@@ -278,6 +271,9 @@ export default function Chat({ sessionId, messages, setMessages, input, setInput
       }
     } finally {
       setIsGenerating(false);
+      if (audioQueue.current.length === 0 && !isPlaying.current) {
+        setCurrentlyPlayingId(null);
+      }
       setCurrentResponse("");
       abortController.current = null;
     }
@@ -336,6 +332,17 @@ export default function Chat({ sessionId, messages, setMessages, input, setInput
     setCurrentlyPlayingId(id);
     audioQueue.current = [{ url, id }];
     playNextAudio();
+  };
+
+  const activeMessageId = currentlyPlayingId;
+
+  const scrollToActiveMessage = () => {
+    if (activeMessageId) {
+      const element = document.getElementById(`msg-${activeMessageId}`);
+      if (element) {
+        element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    }
   };
 
   const currentVoiceObj = 
@@ -427,13 +434,9 @@ export default function Chat({ sessionId, messages, setMessages, input, setInput
           messages.map((msg, idx) => {
             const isLastMessage = idx === messages.length - 1;
             return (
-              <div key={msg.id} className={`flex gap-4 ${msg.role === "user" ? "flex-row-reverse" : ""}`}>
-                <div className={`flex-shrink-0 flex items-center justify-center text-xs font-bold ${
-                  msg.role === "user"
-                    ? "w-8 h-8 rounded-full bg-slate-200 text-slate-700"
-                    : "h-8 px-3 rounded-full bg-indigo-600 text-white shadow-xs"
-                }`}>
-                  {msg.role === "user" ? "US" : (msg.tagName || "TTS")}
+              <div key={msg.id} id={`msg-${msg.id}`} className={`flex gap-4 ${msg.role === "user" ? "flex-row-reverse" : ""}`}>
+                <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${msg.role === "user" ? "bg-slate-200 text-slate-700" : "bg-indigo-600 text-white shadow-xs"}`}>
+                  {msg.role === "user" ? "US" : "TTS"}
                 </div>
                 <div className={`p-4 max-w-lg ${msg.role === "user" ? "bg-slate-100 border border-slate-200/60 rounded-2xl rounded-tr-none" : "bg-indigo-50 border border-indigo-100 rounded-2xl rounded-tl-none"}`}>
                   <p className="text-sm leading-relaxed text-slate-800 whitespace-pre-wrap">
@@ -525,8 +528,8 @@ export default function Chat({ sessionId, messages, setMessages, input, setInput
         )}
       </div>
 
-      <div className="p-6 border-t border-slate-200 bg-white">
-        <form onSubmit={handleSubmit} className="relative flex items-center w-full">
+      <div className="p-6 border-t border-slate-200 bg-white flex items-center gap-4">
+        <form onSubmit={handleSubmit} className="relative flex items-center flex-1">
           <input
             type="text"
             value={input}
@@ -556,6 +559,15 @@ export default function Chat({ sessionId, messages, setMessages, input, setInput
             )}
           </div>
         </form>
+        {activeMessageId && (
+          <button
+            onClick={scrollToActiveMessage}
+            className="p-3 bg-white border border-slate-200 rounded-full hover:bg-slate-50 transition-all shadow-sm text-blue-600 active:scale-95"
+            title="Go to active message"
+          >
+            <ChevronUp size={24} />
+          </button>
+        )}
       </div>
     </div>
   );

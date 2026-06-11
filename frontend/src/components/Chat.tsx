@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect, useMemo } from "react";
 import { Mic, Send, Loader2, Volume2, User, Bot, Globe, Sparkles, Square, Save, CircleOff, ChevronUp } from "lucide-react";
 import { Link } from "react-router";
 import { v4 as uuidv4 } from 'uuid';
+import { generateRandomName } from "../utils/nameGenerator";
 
 type Message = {
   id: string;
@@ -11,6 +12,9 @@ type Message = {
   status?: "generating" | "finished" | "interrupted";
   audioUrl?: string;
   isSaved?: boolean;
+  ramMetrics?: { chunk: string; ramUsageMb: number }[];
+  totalWords?: number;
+  tagName?: string;
 };
 
 interface ChatProps {
@@ -51,7 +55,7 @@ export default function Chat({ sessionId, messages, setMessages, input, setInput
   const [currentlyPlayingId, setCurrentlyPlayingId] = useState<string | null>(null);
   
   // Audio playback queue
-  const audioQueue = useRef<string[]>([]);
+  const audioQueue = useRef<{ url: string; id: string }[]>([]);
   const isPlaying = useRef(false);
   const audioContext = useRef<AudioContext | null>(null);
   const activeSource = useRef<AudioBufferSourceNode | null>(null);
@@ -79,7 +83,8 @@ export default function Chat({ sessionId, messages, setMessages, input, setInput
   }, []);
 
   const playNextAudio = async () => {
-    if (audioQueue.current.length === 0) {
+    const item = audioQueue.current.shift();
+    if (!item) {
       isPlaying.current = false;
       if (!isGenerating) {
         setCurrentlyPlayingId(null);
@@ -88,11 +93,7 @@ export default function Chat({ sessionId, messages, setMessages, input, setInput
     }
 
     isPlaying.current = true;
-    const audioUrl = audioQueue.current.shift();
-    if (!audioUrl) {
-      playNextAudio();
-      return;
-    }
+    setCurrentlyPlayingId(item.id);
 
     try {
       if (!audioContext.current) {
@@ -100,7 +101,7 @@ export default function Chat({ sessionId, messages, setMessages, input, setInput
       }
 
       // Fetch array buffer from URL
-      const res = await fetch(audioUrl);
+      const res = await fetch(item.url);
       const arrayBuffer = await res.arrayBuffer();
       
       const audioBuffer = await audioContext.current.decodeAudioData(arrayBuffer);
@@ -123,14 +124,16 @@ export default function Chat({ sessionId, messages, setMessages, input, setInput
     }
   };
 
-  const enqueueAudio = (base64Audio: string) => {
-    audioQueue.current.push(base64Audio);
+  const enqueueAudio = (url: string, id: string) => {
+    audioQueue.current.push({ url, id });
     if (!isPlaying.current) {
       playNextAudio();
     }
   };
 
   const handleStop = () => {
+    const messageToInterrupt = currentlyPlayingId;
+
     if (abortController.current) {
       abortController.current.abort();
       abortController.current = null;
@@ -166,12 +169,18 @@ export default function Chat({ sessionId, messages, setMessages, input, setInput
     abortController.current = new AbortController();
 
     // Add initial empty assistant message
+    const totalWords = text.trim().split(/\s+/).length;
+    const tagName = generateRandomName();
+
     setMessages(prev => [...prev, {
       id: messageId,
       role: "assistant",
       content: "",
       voice: voice,
-      status: "generating"
+      status: "generating",
+      ramMetrics: [],
+      totalWords: totalWords,
+      tagName: tagName
     }]);
 
     let accumulatedText = "";
@@ -225,7 +234,18 @@ export default function Chat({ sessionId, messages, setMessages, input, setInput
                     m.id === messageId ? { ...m, content: accumulatedText } : m
                   ));
                 } else if (data.status === "audio" && data.audioUrl) {
-                  enqueueAudio(data.audioUrl);
+                  enqueueAudio(data.audioUrl, messageId);
+                  if (data.ramUsageMb) {
+                    setMessages(prev => prev.map(m => {
+                      if (m.id === messageId) {
+                        return {
+                          ...m,
+                          ramMetrics: [...(m.ramMetrics || []), { chunk: data.text, ramUsageMb: data.ramUsageMb }]
+                        };
+                      }
+                      return m;
+                    }));
+                  }
                 } else if (data.status === "done" && data.audioUrl) {
                    // This is the final concatenated URL
                    setMessages(prev => prev.map(m =>
@@ -310,7 +330,7 @@ export default function Chat({ sessionId, messages, setMessages, input, setInput
     }
 
     setCurrentlyPlayingId(id);
-    audioQueue.current = [url];
+    audioQueue.current = [{ url, id }];
     playNextAudio();
   };
 
@@ -332,7 +352,7 @@ export default function Chat({ sessionId, messages, setMessages, input, setInput
       name: customVoices.find(v => v.voice_name === selectedVoice).voice_name,
       gender: "Custom",
       region: "Local",
-      desc: "Custom trained voice embedding"
+      desc: "Custom blended voice embedding"
     } : undefined);
 
   return (
@@ -450,11 +470,11 @@ export default function Chat({ sessionId, messages, setMessages, input, setInput
 
                         <button
                           onClick={() => handleSaveHistory(msg.content, msg.voice || selectedVoice, msg.id)}
-                          disabled={isGenerating || msg.isSaved}
+                          disabled={isGenerating || msg.isSaved || msg.status !== "finished"}
                           className={`flex items-center gap-1.5 px-6 py-2 rounded-full text-[11px] font-bold transition-all shadow-md active:scale-95 ${
                             msg.isSaved
                               ? "bg-slate-100 border border-slate-200 text-slate-400 cursor-not-allowed"
-                              : "bg-white border-2 border-emerald-500 text-emerald-600 hover:bg-emerald-50"
+                              : "bg-white border-2 border-emerald-500 text-emerald-600 hover:bg-emerald-50 disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:border-slate-200 disabled:text-slate-400"
                           }`}
                         >
                           <Save size={12} /> {msg.isSaved ? "SAVED" : "SAVE"}
@@ -519,7 +539,7 @@ export default function Chat({ sessionId, messages, setMessages, input, setInput
             className="w-full bg-slate-50 border border-slate-200 rounded-full py-4 px-6 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all pr-16 text-slate-800 placeholder:text-slate-400 disabled:opacity-50"
           />
           <div className="absolute right-2">
-            {isGenerating ? (
+            {isGenerating || currentlyPlayingId ? (
               <button
                 type="button"
                 onClick={handleStop}

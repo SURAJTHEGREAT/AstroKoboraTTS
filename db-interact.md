@@ -1,6 +1,6 @@
 # Database Interaction Guide
 
-This project uses an SQLite database to store metadata for custom trained voices. The database file is located at `data/metadata.db`.
+This project uses an SQLite database to store metadata for custom blended voices. The database file is located at `data/metadata.db`.
 
 This guide provides instructions on how to access the database, list tables, and run queries using the `sqlite3` command-line interface.
 

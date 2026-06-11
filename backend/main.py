@@ -15,8 +15,9 @@ import secrets
 import re
 import soundfile as sf
 import numpy as np
+import psutil
 
-from database import init_db, get_db, Voice, ApiClient, ApiClientStat, TtsHistory
+from database import init_db, get_db, AsyncSessionLocal, Voice, ApiClient, ApiClientStat, TtsHistory
 
 # Need to import Kokoro carefully, will mock if not available during early setup
 try:
@@ -64,6 +65,19 @@ kokoro_model: Optional[Any] = None
 @app.on_event("startup")
 async def startup_event():
     await init_db()
+
+    # Ensure "direct" client exists for tracking web interface analytics
+    async with AsyncSessionLocal() as db:
+        result = await db.execute(select(ApiClient).where(ApiClient.client_id == "direct"))
+        if not result.scalar_one_or_none():
+            direct_client = ApiClient(
+                client_name="direct",
+                client_id="direct",
+                client_secret=secrets.token_hex(32)
+            )
+            db.add(direct_client)
+            await db.commit()
+            print("Initialized 'direct' API client for web analytics.")
 
     # Clear session audio on startup
     if os.path.exists(session_audio_dir):
@@ -222,7 +236,10 @@ async def tts_endpoint(request: Request, body: TTSRequest, db: AsyncSession = De
 
                 print(f"[Chunk {i}] Processing text: '{text_chunk}'")
 
-                yield f"data: {json.dumps({'status': 'audio', 'text': text_chunk, 'audioUrl': f'/api/audio/{filename}'})}\n\n"
+                process = psutil.Process(os.getpid())
+                ram_usage_mb = process.memory_info().rss / (1024 * 1024)
+
+                yield f"data: {json.dumps({'status': 'audio', 'text': text_chunk, 'audioUrl': f'/api/audio/{filename}', 'ramUsageMb': round(ram_usage_mb, 2)})}\n\n"
 
                 # Cleanup task (fire and forget)
                 async def delete_later(path):
@@ -239,14 +256,14 @@ async def tts_endpoint(request: Request, body: TTSRequest, db: AsyncSession = De
                 return
 
         # Track stats
-        if client:
-            new_stat = ApiClientStat(
-                client_id=client.client_id,
-                words_processed=words_processed,
-                ttfb_ms=ttfb_ms
-            )
-            db.add(new_stat)
-            await db.commit()
+        tracking_client_id = client.client_id if client else "direct"
+        new_stat = ApiClientStat(
+            client_id=tracking_client_id,
+            words_processed=words_processed,
+            ttfb_ms=ttfb_ms
+        )
+        db.add(new_stat)
+        await db.commit()
 
         if not interrupted:
             # Save session audio
@@ -407,7 +424,7 @@ async def get_voices(request: Request, db: AsyncSession = Depends(get_db)):
             "voice_name": v.voice_name,
             "file_path": v.file_path,
             "original_filename": v.original_filename,
-            "created_at": v.created_at.isoformat()
+            "created_at": v.created_at.isoformat() + "Z"
         }
         for v in voices
     ]
@@ -474,7 +491,7 @@ async def get_history(db: AsyncSession = Depends(get_db)):
         "text": h.text,
         "voice": h.voice,
         "audio_url": f"/api/history/audio/{h.audio_path}",
-        "created_at": h.created_at.isoformat()
+        "created_at": h.created_at.isoformat() + "Z"
     } for h in records]
 
 @app.get("/api/history/audio/{filename}")

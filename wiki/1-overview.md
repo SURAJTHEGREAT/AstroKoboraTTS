@@ -14,7 +14,7 @@ At its core, a Text-to-Speech system aims to convert written human language (tex
 
 - **In-Memory Generation**: Relies on `kokoro-onnx` with the `onnx-community/Kokoro-82M-v1.0-ONNX` model optimized for CPUs.
 - **Real-Time Streaming**: By leveraging Server-Sent Events (SSE), the application can stream audio chunks to the frontend as they are generated, rather than waiting for the entire text to be processed.
-- **Custom Voice Training**: Allows users to upload custom `.wav` samples to create unique voice embeddings stored locally and tracked via SQLite.
+- **Custom Voice Blending**: Allows users to blend existing voices to create unique voice embeddings stored locally and tracked via SQLite.
 - **Full-Stack Integration**: Provides a comprehensive React frontend for user interaction and an FastAPI backend for API management.
 - **Analytics & Tracking**: Tracks API usage, words processed, and Time To First Byte (TTFB) to monitor performance.
 

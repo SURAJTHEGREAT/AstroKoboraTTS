@@ -13,7 +13,7 @@ The system is composed of the following major components:
 
 2. **Backend (FastAPI)**:
    - Serves as the central orchestrator and API gateway.
-   - Exposes RESTful endpoints for TTS generation (`/api/tts`), voice training (`/api/train`), and analytics (`/api/analytics`).
+   - Exposes RESTful endpoints for TTS generation (`/api/tts`), voice blending (`/api/blend`), and analytics (`/api/analytics`).
    - Can run in an "API-only" mode (`API_ONLY=true`) to bypass static file serving for headless integrations.
    - Interfaces directly with the SQLite database for metadata management and the file system for audio/model storage.
 

@@ -174,8 +174,6 @@ export default function Chat({ sessionId, messages, setMessages, input, setInput
     abortController.current = new AbortController();
 
     // Add initial empty assistant message
-    const totalWords = text.trim().split(/\s+/).length;
-
     setMessages(prev => [...prev, {
       id: messageId,
       role: "assistant",
@@ -183,7 +181,7 @@ export default function Chat({ sessionId, messages, setMessages, input, setInput
       voice: voice,
       status: "generating",
       ramMetrics: [],
-      totalWords: totalWords
+      totalWords: 0
     }]);
 
     let accumulatedText = "";
@@ -233,8 +231,9 @@ export default function Chat({ sessionId, messages, setMessages, input, setInput
                 if (data.status === "text") {
                   accumulatedText += data.text;
                   setCurrentResponse(accumulatedText);
+                  const currentWords = accumulatedText.trim() === "" ? 0 : accumulatedText.trim().split(/\s+/).length;
                   setMessages(prev => prev.map(m =>
-                    m.id === messageId ? { ...m, content: accumulatedText } : m
+                    m.id === messageId ? { ...m, content: accumulatedText, totalWords: currentWords } : m
                   ));
                 } else if (data.status === "audio" && data.audioUrl) {
                   enqueueAudio(data.audioUrl, messageId);

@@ -15,6 +15,7 @@ type Message = {
   ramMetrics?: { chunk: string; ramUsageMb: number }[];
   totalWords?: number;
   tagName?: string;
+  ttfbMs?: number;
 };
 
 interface ChatProps {
@@ -235,12 +236,15 @@ export default function Chat({ sessionId, messages, setMessages, input, setInput
                   ));
                 } else if (data.status === "audio" && data.audioUrl) {
                   enqueueAudio(data.audioUrl, messageId);
-                  if (data.ramUsageMb) {
+                  if (data.ramUsageMb || data.ttfbMs !== undefined) {
                     setMessages(prev => prev.map(m => {
                       if (m.id === messageId) {
                         return {
                           ...m,
-                          ramMetrics: [...(m.ramMetrics || []), { chunk: data.text, ramUsageMb: data.ramUsageMb }]
+                          ramMetrics: data.ramUsageMb
+                            ? [...(m.ramMetrics || []), { chunk: data.text, ramUsageMb: data.ramUsageMb }]
+                            : m.ramMetrics,
+                          ttfbMs: data.ttfbMs !== undefined ? data.ttfbMs : m.ttfbMs
                         };
                       }
                       return m;

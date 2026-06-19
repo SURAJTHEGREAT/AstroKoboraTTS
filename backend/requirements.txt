@@ -9,3 +9,7 @@ pytest
 httpx
 pytest-asyncio
 psutil
+ctranslate2
+sentencepiece
+huggingface-hub
+transformers

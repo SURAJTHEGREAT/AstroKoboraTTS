@@ -16,6 +16,10 @@ import re
 import soundfile as sf
 import numpy as np
 import psutil
+import ctranslate2
+import transformers
+from huggingface_hub import snapshot_download
+import multiprocessing
 
 from database import init_db, get_db, AsyncSessionLocal, Voice, ApiClient, ApiClientStat, TtsHistory
 
@@ -60,7 +64,25 @@ os.makedirs(temp_dir, exist_ok=True)
 session_audio_dir = os.path.join(data_dir, "session_audio")
 os.makedirs(session_audio_dir, exist_ok=True)
 
+translation_models_dir = os.path.join(data_dir, "translation_models")
+os.makedirs(translation_models_dir, exist_ok=True)
+
 kokoro_model: Optional[Any] = None
+nllb_translator: Optional[Any] = None
+nllb_tokenizer: Optional[Any] = None
+
+# NLLB Language Prefix Mapping
+NLLB_LANG_MAP = {
+    "eng_Latn": {"name": "English", "kokoro_lang": "en-us", "default_voice": "af_heart"},
+    "fra_Latn": {"name": "French", "kokoro_lang": "fr", "default_voice": "ff_siwis"},
+    "spa_Latn": {"name": "Spanish", "kokoro_lang": "es", "default_voice": "ef_dora"},
+    "ita_Latn": {"name": "Italian", "kokoro_lang": "it", "default_voice": "if_sara"},
+    "deu_Latn": {"name": "German", "kokoro_lang": "de", "default_voice": "df_sarah"}, # Assuming German support or fallback
+    "jpn_Jpan": {"name": "Japanese", "kokoro_lang": "ja", "default_voice": "jf_alpha"},
+    "hin_Deva": {"name": "Hindi", "kokoro_lang": "hi", "default_voice": "hf_alpha"},
+    "por_Latn": {"name": "Portuguese", "kokoro_lang": "pt", "default_voice": "pf_dora"},
+    "zho_Hans": {"name": "Chinese", "kokoro_lang": "zh", "default_voice": "zf_xiaobei"},
+}
 
 @app.on_event("startup")
 async def startup_event():
@@ -102,6 +124,29 @@ async def startup_event():
     else:
         print(f"Warning: Model files not found at {model_path} or {voices_path}. TTS will not work.")
 
+    # Initialize Translation Model
+    global nllb_translator, nllb_tokenizer
+    nllb_repo = "Tushe/nllb-200-600M-ct2-int8"
+    nllb_path = os.path.join(translation_models_dir, "nllb-200-600M-ct2-int8")
+
+    if not os.path.exists(nllb_path):
+        try:
+            print(f"Downloading translation model {nllb_repo}...")
+            snapshot_download(repo_id=nllb_repo, local_dir=nllb_path)
+        except Exception as e:
+            print(f"Failed to download translation model: {e}")
+
+    if os.path.exists(nllb_path):
+        try:
+            print("Loading Translation model...")
+            nllb_tokenizer = transformers.AutoTokenizer.from_pretrained(nllb_path)
+            # Use system core counts for intra_threads as required
+            cpu_count = multiprocessing.cpu_count()
+            nllb_translator = ctranslate2.Translator(nllb_path, device="cpu", intra_threads=cpu_count)
+            print(f"Translation Model successfully loaded with {cpu_count} intra_threads!")
+        except Exception as e:
+            print(f"Failed to load Translation model: {e}")
+
 async def api_auth_middleware(request: Request, db: AsyncSession = Depends(get_db)):
     if os.environ.get("API_ONLY") != "true":
         return None
@@ -135,6 +180,8 @@ class TTSRequest(BaseModel):
     voice: str = "af_heart"
     session_id: Optional[str] = None
     message_id: Optional[str] = None
+    source_lang: Optional[str] = None
+    target_lang: Optional[str] = None
 
 def chunk_text(text: str, max_words: int = 10) -> List[str]:
     words = text.split()
@@ -148,6 +195,37 @@ def sanitize_id(id_str: Optional[str]) -> Optional[str]:
         return None
     return re.sub(r'[^a-zA-Z0-9-]', '', id_str)
 
+async def translate_text(text: str, src_lang: str, tgt_lang: str) -> str:
+    if not nllb_translator or not nllb_tokenizer:
+        print("Translation model not loaded, skipping translation.")
+        return text
+
+    try:
+        nllb_tokenizer.src_lang = src_lang
+        source = nllb_tokenizer.convert_ids_to_tokens(nllb_tokenizer.encode(text))
+
+        results = await asyncio.get_event_loop().run_in_executor(
+            None,
+            lambda: nllb_translator.translate_batch(
+                [source],
+                target_prefix=[[tgt_lang]],
+                beam_size=4,
+                max_decoding_length=256,
+                repetition_penalty=1.2
+            )
+        )
+
+        output_tokens = results[0].hypotheses[0]
+        # Remove target prefix from output if present
+        if tgt_lang in output_tokens:
+            output_tokens = [t for t in output_tokens if t != tgt_lang]
+
+        translated_text = nllb_tokenizer.decode(nllb_tokenizer.convert_tokens_to_ids(output_tokens))
+        return translated_text
+    except Exception as e:
+        print(f"Translation error: {e}")
+        return text
+
 @app.post("/api/tts")
 async def tts_endpoint(request: Request, body: TTSRequest, db: AsyncSession = Depends(get_db)):
     client = await api_auth_middleware(request, db)
@@ -159,10 +237,24 @@ async def tts_endpoint(request: Request, body: TTSRequest, db: AsyncSession = De
     if not message:
         raise HTTPException(status_code=400, detail="Message is required")
 
+    # Handle Translation
+    kokoro_lang = "en-us"
+    requested_voice = body.voice
+
+    if body.source_lang and body.target_lang and body.source_lang != body.target_lang:
+        print(f"Translating from {body.source_lang} to {body.target_lang}")
+        message = await translate_text(message, body.source_lang, body.target_lang)
+
+        # Map target_lang to Kokoro lang and default voice if not explicitly provided
+        if body.target_lang in NLLB_LANG_MAP:
+            kokoro_lang = NLLB_LANG_MAP[body.target_lang]["kokoro_lang"]
+            # If the user didn't specify a custom voice, or specified a default one, use the language's default
+            if requested_voice == "af_heart" or requested_voice not in [v.id for v in []]: # Simplified check
+                 requested_voice = NLLB_LANG_MAP[body.target_lang]["default_voice"]
+
     words_processed = len(message.split())
 
     # Check if voice exists natively, else simulate fallback
-    requested_voice = body.voice
     actual_voice_style = requested_voice
 
     # Check if it's a custom/blended voice in our DB
@@ -220,7 +312,7 @@ async def tts_endpoint(request: Request, body: TTSRequest, db: AsyncSession = De
                 loop = asyncio.get_event_loop()
                 samples, sample_rate = await loop.run_in_executor(
                     None,
-                    lambda: kokoro_model.create(text_chunk, voice=actual_voice_style, speed=1.0, lang="en-us")
+                    lambda: kokoro_model.create(text_chunk, voice=actual_voice_style, speed=1.0, lang=kokoro_lang)
                 )
 
                 filename = f"chunk-{int(time.time() * 1000)}-{i}.wav"

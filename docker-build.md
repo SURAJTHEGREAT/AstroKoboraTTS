@@ -44,3 +44,26 @@ This document provides instructions on how to build and run the Kokoro TTS appli
 
 - The frontend container uses `npm run dev` and mounts the `./frontend/src` directory, so local changes to the UI code will trigger a hot reload in the browser.
 - If you need to make changes to the backend Python code, you will need to restart the backend container or modify the `docker-compose.yaml` to run `uvicorn` with the `--reload` flag and mount the backend directory.
+
+## Running Standalone Backend
+
+For API-only deployments, you can build and run the backend container independently without the frontend.
+
+### 1. Build the Backend Image
+From the repository root, run:
+```bash
+docker build -f backend/Dockerfile.backend -t kokoro-backend ./backend
+```
+
+### 2. Run the Backend Container
+Start the container with the `API_ONLY=true` environment variable and map the persistent data directory:
+```bash
+docker run -d \
+  --name tts-backend \
+  -p 8000:8000 \
+  -e API_ONLY=true \
+  -v $(pwd)/data:/app/data \
+  kokoro-backend
+```
+
+This will expose the FastAPI backend at `http://localhost:8000` with authentication enabled.

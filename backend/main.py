@@ -336,7 +336,7 @@ class BlendRequest(BaseModel):
 
 @app.post("/api/blend")
 async def blend_endpoint(body: BlendRequest, db: AsyncSession = Depends(get_db)):
-    if body.username != "admin" or body.password != "password":
+    if body.username != "admin" or body.password != "kP9$vW2!mX7#qZ4":
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
     if not body.voiceName:
@@ -366,7 +366,7 @@ class ClientRequest(BaseModel):
 
 @app.post("/api/clients")
 async def create_client(body: ClientRequest, db: AsyncSession = Depends(get_db)):
-    if body.username != "admin" or body.password != "password":
+    if body.username != "admin" or body.password != "kP9$vW2!mX7#qZ4":
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
     client_id = "client_" + secrets.token_hex(16)
@@ -396,7 +396,7 @@ class AnalyticsRequest(BaseModel):
 
 @app.post("/api/analytics")
 async def get_analytics(body: AnalyticsRequest, db: AsyncSession = Depends(get_db)):
-    if body.username != "admin" or body.password != "password":
+    if body.username != "admin" or body.password != "kP9$vW2!mX7#qZ4":
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
     # Group by client and get stats

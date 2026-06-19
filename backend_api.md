@@ -28,14 +28,14 @@ When `API_ONLY=true` is enabled, core endpoints require authentication headers.
 
 ### Generating API Credentials
 
-To generate a new set of credentials, use the `/api/clients` endpoint. This requires admin credentials (default `admin`/`password`).
+To generate a new set of credentials, use the `/api/clients` endpoint. This requires admin credentials (default `admin`/`kP9$vW2!mX7#qZ4`).
 
 **Endpoint:** `POST /api/clients`
 
 ```bash
 curl -X POST http://localhost:8000/api/clients \
   -H "Content-Type: application/json" \
-  -d '{"username": "admin", "password": "password", "clientName": "MyExternalApp"}'
+  -d '{"username": "admin", "password": "kP9$vW2!mX7#qZ4", "clientName": "MyExternalApp"}'
 ```
 
 ## Core API Endpoints
@@ -85,7 +85,7 @@ The `/api/blend` endpoint allows you to blend two existing voices to create a ne
 ```bash
 curl -X POST http://localhost:8000/api/blend \
   -H "Content-Type: application/json" \
-  -d '{"username": "admin", "password": "password", "voiceName": "my_blended_voice", "voiceA": "af_heart", "voiceB": "am_adam", "ratio": 0.5}'
+  -d '{"username": "admin", "password": "kP9$vW2!mX7#qZ4", "voiceName": "my_blended_voice", "voiceA": "af_heart", "voiceB": "am_adam", "ratio": 0.5}'
 ```
 
 ### 4. Fetching Analytics Data
@@ -99,7 +99,7 @@ Retrieves usage statistics aggregated by API client. Uses admin credentials.
 ```bash
 curl -X POST http://localhost:8000/api/analytics \
   -H "Content-Type: application/json" \
-  -d '{"username": "admin", "password": "password"}'
+  -d '{"username": "admin", "password": "kP9$vW2!mX7#qZ4"}'
 ```
 
 ## Running with Docker (Standalone Backend)

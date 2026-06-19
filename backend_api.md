@@ -12,47 +12,35 @@ pip install -r requirements.txt
 uvicorn main:app --reload --port 8000
 ```
 
-The console will indicate that it is running on `http://localhost:8000`
+The console will indicate that it is running on `http://localhost:8000`.
 
-If you start the backend with `API_ONLY=true`, then `x-client-id` and `x-client-secret` headers will be required on the `/api/tts` endpoint.
+### API Only Mode
+
+If you start the backend with `API_ONLY=true`, then `x-client-id` and `x-client-secret` headers will be required on core endpoints like `/api/tts` and `/api/voices`.
+
+```bash
+API_ONLY=true uvicorn main:app --port 8000
+```
+
+## Authentication
+
+When `API_ONLY=true` is enabled, core endpoints require authentication headers.
+
+### Generating API Credentials
+
+To generate a new set of credentials, use the `/api/clients` endpoint. This requires admin credentials (default `admin`/`password`).
+
+**Endpoint:** `POST /api/clients`
+
+```bash
+curl -X POST http://localhost:8000/api/clients \
+  -H "Content-Type: application/json" \
+  -d '{"username": "admin", "password": "password", "clientName": "MyExternalApp"}'
+```
 
 ## Core API Endpoints
 
-### 1. Blending Custom Voices
-
-The `/api/blend` endpoint allows you to blend two existing voices to create a new one.
-
-**Endpoint:** `POST /api/blend`
-**Content-Type:** `application/json`
-
-**Parameters (JSON Body):**
-- `username` (string): Admin username (default: `admin`)
-- `password` (string): Admin password (default: `password`)
-- `voice_name` (string): The name to assign to this blended voice.
-- `voice_a` (string): The first voice to blend.
-- `voice_b` (string): The second voice to blend.
-- `ratio` (number): The blend ratio (0 to 1).
-
-#### Example using `curl`:
-
-```bash
-# Blend voices to create a new embedding named "my_blended_voice"
-curl -X POST http://localhost:8000/api/blend \
-  -H "Content-Type: application/json" \
-  -d '{"username": "admin", "password": "password", "voice_name": "my_blended_voice", "voice_a": "af_heart", "voice_b": "am_adam", "ratio": 0.5}'
-```
-
-**Expected Response:**
-
-```json
-{
-  "success": true,
-  "message": "Voice blended successfully",
-  "voice_name": "my_blended_voice"
-}
-```
-
-### 2. Generating Text-to-Speech (TTS)
+### 1. Generating Text-to-Speech (TTS)
 
 The `/api/tts` endpoint receives text and streams back chunks of generated audio via Server-Sent Events (SSE).
 
@@ -61,46 +49,52 @@ The `/api/tts` endpoint receives text and streams back chunks of generated audio
 
 **Parameters (JSON Body):**
 - `message` (string): The text you want to convert to speech.
-- `voice` (string): The voice to use. You can pass built-in voices (like `af_heart`) or the custom `voiceName` you uploaded previously.
+- `voice` (string): The voice to use (e.g., `af_heart` or a custom `voiceName`).
 
-#### Example using `curl`:
-
-Using the newly created `my_custom_voice` embedding:
+#### Example using `curl` (API Only Mode):
 
 ```bash
 curl -N -X POST http://localhost:8000/api/tts \
   -H "Content-Type: application/json" \
-  -d '{"message": "Hello, this is a test using my new custom voice.", "voice": "my_custom_voice"}'
+  -H "x-client-id: YOUR_CLIENT_ID" \
+  -H "x-client-secret: YOUR_CLIENT_SECRET" \
+  -d '{"message": "Hello, this is a test.", "voice": "af_heart"}'
 ```
 
-**Note:** The `-N` or `--no-buffer` flag is important here because the API returns a Server-Sent Events (SSE) stream. You will receive multiple events as the engine processes the text into audio chunks.
+**Note:** The `-N` or `--no-buffer` flag is important for SSE streams.
 
-**Expected SSE Stream Response:**
+### 2. Fetching Available Voices
 
-```text
-data: {"status":"thinking"}
+**Endpoint:** `GET /api/voices`
 
-data: {"status":"text","text":"Hello, this is a test using my new custom voice."}
-
-data: {"status":"audio","text":"Hello, ","audioUrl":"/api/audio/chunk-1718884930-0.wav"}
-
-data: {"status":"done"}
+```bash
+curl -X GET http://localhost:8000/api/voices \
+  -H "x-client-id: YOUR_CLIENT_ID" \
+  -H "x-client-secret: YOUR_CLIENT_SECRET"
 ```
 
-You can then download the generated audio chunk by navigating to `http://localhost:8000/api/audio/chunk-1718884930-0.wav` (the URL provided in the `audioUrl` field).
+### 3. Blending Custom Voices
 
-### 3. Fetching Analytics Data
+The `/api/blend` endpoint allows you to blend two existing voices to create a new one. This uses admin credentials in the JSON body.
 
-The `/api/analytics` endpoint provides access to TTS usage statistics (total files generated, words processed, average time to first byte) aggregated by API client.
-
-**Endpoint:** `POST /api/analytics`
+**Endpoint:** `POST /api/blend`
 **Content-Type:** `application/json`
 
-**Parameters (JSON Body):**
-- `username` (string): Admin username (default: `admin`)
-- `password` (string): Admin password (default: `password`)
+#### Example:
 
-#### Example using `curl`:
+```bash
+curl -X POST http://localhost:8000/api/blend \
+  -H "Content-Type: application/json" \
+  -d '{"username": "admin", "password": "password", "voiceName": "my_blended_voice", "voiceA": "af_heart", "voiceB": "am_adam", "ratio": 0.5}'
+```
+
+### 4. Fetching Analytics Data
+
+Retrieves usage statistics aggregated by API client. Uses admin credentials.
+
+**Endpoint:** `POST /api/analytics`
+
+#### Example:
 
 ```bash
 curl -X POST http://localhost:8000/api/analytics \
@@ -108,15 +102,12 @@ curl -X POST http://localhost:8000/api/analytics \
   -d '{"username": "admin", "password": "password"}'
 ```
 
-**Expected Response:**
+## Running with Docker (Standalone Backend)
 
-```json
-[
-  {
-    "client_name": "Test Client",
-    "total_files_generated": 25,
-    "total_words_processed": 1500,
-    "avg_ttfb_ms": 2540
-  }
-]
-```
+To run only the backend service using Docker:
+
+1. **Build:** `docker build -f backend/Dockerfile.backend -t kokoro-backend ./backend`
+2. **Run:**
+   ```bash
+   docker run -d -p 8000:8000 -e API_ONLY=true -v $(pwd)/data:/app/data kokoro-backend
+   ```

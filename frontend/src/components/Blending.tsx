@@ -37,7 +37,7 @@ export default function Blending() {
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
-    if (username === "admin" && password === "password") {
+    if (username === "admin" && password === "kP9$vW2!mX7#qZ4") {
       setIsAuthenticated(true);
       setLoginError("");
     } else {

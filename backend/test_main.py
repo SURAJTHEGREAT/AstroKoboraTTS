@@ -65,7 +65,7 @@ async def test_direct_analytics():
         # 2. Check analytics
         analytics_data = {
             "username": "admin",
-            "password": "password"
+            "password": "kP9$vW2!mX7#qZ4"
         }
         response = client.post("/api/analytics", json=analytics_data)
         assert response.status_code == 200
@@ -95,7 +95,7 @@ def test_invalid_credentials_clients():
 def test_blend_voices():
     blend_data = {
         "username": "admin",
-        "password": "password",
+        "password": "kP9$vW2!mX7#qZ4",
         "voiceName": "TestBlend",
         "voiceA": "af_heart",
         "voiceB": "am_adam",
@@ -116,7 +116,7 @@ def test_blend_voices():
 def test_blend_duplicate_name():
     blend_data = {
         "username": "admin",
-        "password": "password",
+        "password": "kP9$vW2!mX7#qZ4",
         "voiceName": "Duplicate",
         "voiceA": "af_heart",
         "voiceB": "am_adam",

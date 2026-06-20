@@ -132,7 +132,7 @@ async def startup_event():
     if not os.path.exists(nllb_path):
         try:
             print(f"Downloading translation model {nllb_repo}...")
-            snapshot_download(repo_id=nllb_repo, local_dir=nllb_path)
+            snapshot_download(repo_id=nllb_repo, local_dir=nllb_path, token=os.environ.get("HF_TOKEN"))
         except Exception as e:
             print(f"Failed to download translation model: {e}")
 

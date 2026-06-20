@@ -19,9 +19,12 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile.backend
+      args:
+        - HF_TOKEN=${HF_TOKEN}
     ports:
       - "8000:8000"
     volumes:
       - ./data:/app/data
     environment:
       - NODE_ENV=development
+      - HF_TOKEN=${HF_TOKEN}

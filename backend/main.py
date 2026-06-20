@@ -217,7 +217,7 @@ async def translate_text(text: str, src_lang: str, tgt_lang: str) -> str:
                 tokenized_sentences,
                 target_prefix=[[tgt_lang]] * len(tokenized_sentences),
                 beam_size=2,
-                max_batch_size=16,
+                max_batch_size=1024,
                 batch_type="tokens",
                 max_decoding_length=256,
                 repetition_penalty=1.2

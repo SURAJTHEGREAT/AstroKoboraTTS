@@ -81,7 +81,7 @@ NLLB_LANG_MAP = {
     "jpn_Jpan": {"name": "Japanese", "kokoro_lang": "ja", "default_voice": "jf_alpha"},
     "hin_Deva": {"name": "Hindi", "kokoro_lang": "hi", "default_voice": "hf_alpha"},
     "por_Latn": {"name": "Portuguese", "kokoro_lang": "pt-br", "default_voice": "pf_dora"},
-    "zho_Hans": {"name": "Chinese", "kokoro_lang": "zh", "default_voice": "zf_xiaobei"},
+    "zho_Hans": {"name": "Chinese", "kokoro_lang": "cmn", "default_voice": "zf_xiaobei"},
 }
 
 @app.on_event("startup")
@@ -209,9 +209,9 @@ async def translate_text(text: str, src_lang: str, tgt_lang: str) -> str:
             lambda: nllb_translator.translate_batch(
                 [source],
                 target_prefix=[[tgt_lang]],
-                beam_size=1,
+                beam_size=2,
                 max_decoding_length=256,
-                repetition_penalty=1.2
+                repetition_penalty=1.1
             )
         )
 

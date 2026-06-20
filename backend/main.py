@@ -237,20 +237,22 @@ async def tts_endpoint(request: Request, body: TTSRequest, db: AsyncSession = De
     if not message:
         raise HTTPException(status_code=400, detail="Message is required")
 
-    # Handle Translation
+    # Handle Translation & Language Mapping
     kokoro_lang = "en-us"
     requested_voice = body.voice
 
-    if body.source_lang and body.target_lang and body.source_lang != body.target_lang:
-        print(f"Translating from {body.source_lang} to {body.target_lang}")
-        message = await translate_text(message, body.source_lang, body.target_lang)
+    if body.source_lang and body.target_lang:
+        # Only translate if languages are different
+        if body.source_lang != body.target_lang:
+            print(f"Translating from {body.source_lang} to {body.target_lang}")
+            message = await translate_text(message, body.source_lang, body.target_lang)
 
-        # Map target_lang to Kokoro lang and default voice if not explicitly provided
+        # Always map target_lang to Kokoro lang and default voice if target_lang is provided
         if body.target_lang in NLLB_LANG_MAP:
             kokoro_lang = NLLB_LANG_MAP[body.target_lang]["kokoro_lang"]
-            # If the user didn't specify a custom voice, or specified a default one, use the language's default
-            if requested_voice == "af_heart" or requested_voice not in [v.id for v in []]: # Simplified check
-                 requested_voice = NLLB_LANG_MAP[body.target_lang]["default_voice"]
+            # If requested voice is the default 'af_heart', override with language-specific default
+            if requested_voice == "af_heart":
+                requested_voice = NLLB_LANG_MAP[body.target_lang]["default_voice"]
 
     words_processed = len(message.split())
 

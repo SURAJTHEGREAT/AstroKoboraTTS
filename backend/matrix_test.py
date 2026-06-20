@@ -83,16 +83,24 @@ def main():
     cpu_count = multiprocessing.cpu_count()
     translator = ctranslate2.Translator(model_path, device="cpu", intra_threads=cpu_count)
 
-    target_languages = [
-        ("fra_Latn", "French"),
-        ("spa_Latn", "Spanish"),
-        ("ita_Latn", "Italian"),
-        ("deu_Latn", "German"),
-        ("jpn_Jpan", "Japanese"),
-        ("hin_Deva", "Hindi"),
-        ("por_Latn", "Portuguese"),
-        ("zho_Hans", "Chinese"),
-    ]
+    # NLLB Language Prefix Mapping from main.py for reference
+    all_supported = {
+        "fra_Latn": "French",
+        "spa_Latn": "Spanish",
+        "ita_Latn": "Italian",
+        "deu_Latn": "German",
+        "jpn_Jpan": "Japanese",
+        "hin_Deva": "Hindi",
+        "por_Latn": "Portuguese",
+        "zho_Hans": "Chinese",
+    }
+
+    target_lang_env = os.environ.get("TARGET_LANGS")
+    if target_lang_env:
+        codes = [c.strip() for c in target_lang_env.split(",")]
+        target_languages = [(c, all_supported.get(c, c)) for c in codes]
+    else:
+        target_languages = list(all_supported.items())
 
     results = []
 
@@ -115,11 +123,21 @@ def main():
             "Code": lang_code,
             "Latency (ms)": round(latency_ms, 2),
             "Accuracy (%)": round(accuracy, 2),
-            "Translated": translated[:50] + "..." if len(translated) > 50 else translated,
-            "Round Trip": round_trip[:50] + "..." if len(round_trip) > 50 else round_trip
+            "Translated": translated,
+            "Round Trip": round_trip
         })
 
-    print(tabulate(results, headers="keys", tablefmt="grid"))
+    # Prepare table results (with truncation)
+    table_results = []
+    for r in results:
+        tr = r.copy()
+        if len(tr["Translated"]) > 50:
+            tr["Translated"] = tr["Translated"][:50] + "..."
+        if len(tr["Round Trip"]) > 50:
+            tr["Round Trip"] = tr["Round Trip"][:50] + "..."
+        table_results.append(tr)
+
+    print(tabulate(table_results, headers="keys", tablefmt="grid"))
 
     if os.environ.get("OUTPUT_FORMAT") == "json":
         print("\nJSON_BEGIN")

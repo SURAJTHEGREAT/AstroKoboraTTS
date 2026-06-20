@@ -74,13 +74,13 @@ nllb_tokenizer: Optional[Any] = None
 # NLLB Language Prefix Mapping
 NLLB_LANG_MAP = {
     "eng_Latn": {"name": "English", "kokoro_lang": "en-us", "default_voice": "af_heart"},
-    "fra_Latn": {"name": "French", "kokoro_lang": "fr", "default_voice": "ff_siwis"},
+    "fra_Latn": {"name": "French", "kokoro_lang": "fr-fr", "default_voice": "ff_siwis"},
     "spa_Latn": {"name": "Spanish", "kokoro_lang": "es", "default_voice": "ef_dora"},
     "ita_Latn": {"name": "Italian", "kokoro_lang": "it", "default_voice": "if_sara"},
     "deu_Latn": {"name": "German", "kokoro_lang": "de", "default_voice": "df_sarah"}, # Assuming German support or fallback
     "jpn_Jpan": {"name": "Japanese", "kokoro_lang": "ja", "default_voice": "jf_alpha"},
     "hin_Deva": {"name": "Hindi", "kokoro_lang": "hi", "default_voice": "hf_alpha"},
-    "por_Latn": {"name": "Portuguese", "kokoro_lang": "pt", "default_voice": "pf_dora"},
+    "por_Latn": {"name": "Portuguese", "kokoro_lang": "pt-br", "default_voice": "pf_dora"},
     "zho_Hans": {"name": "Chinese", "kokoro_lang": "zh", "default_voice": "zf_xiaobei"},
 }
 

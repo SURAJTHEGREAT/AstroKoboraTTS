@@ -216,11 +216,8 @@ async def translate_text(text: str, src_lang: str, tgt_lang: str) -> str:
         )
 
         output_tokens = results[0].hypotheses[0]
-        # Remove target prefix from output if present
-        if tgt_lang in output_tokens:
-            output_tokens = [t for t in output_tokens if t != tgt_lang]
-
-        translated_text = nllb_tokenizer.decode(nllb_tokenizer.convert_tokens_to_ids(output_tokens))
+        output_ids = nllb_tokenizer.convert_tokens_to_ids(output_tokens)
+        translated_text = nllb_tokenizer.decode(output_ids, skip_special_tokens=True)
         return translated_text
     except Exception as e:
         print(f"Translation error: {e}")

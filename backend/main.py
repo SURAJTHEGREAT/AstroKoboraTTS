@@ -139,7 +139,7 @@ async def startup_event():
     if os.path.exists(nllb_path):
         try:
             print("Loading Translation model...")
-            nllb_tokenizer = transformers.AutoTokenizer.from_pretrained(nllb_path, fix_mistral_regex=True)
+            nllb_tokenizer = transformers.AutoTokenizer.from_pretrained(nllb_path)
             # Use system core counts for intra_threads as required
             cpu_count = multiprocessing.cpu_count()
             nllb_translator = ctranslate2.Translator(nllb_path, device="cpu", intra_threads=cpu_count)
@@ -209,7 +209,7 @@ async def translate_text(text: str, src_lang: str, tgt_lang: str) -> str:
             lambda: nllb_translator.translate_batch(
                 [source],
                 target_prefix=[[tgt_lang]],
-                beam_size=1,
+                beam_size=4,
                 max_decoding_length=256,
                 repetition_penalty=1.2
             )

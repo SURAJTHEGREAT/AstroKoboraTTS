@@ -1,34 +1,3 @@
-FROM python:3.11-slim
-
-WORKDIR /app
-
-# Install system dependencies
-RUN apt-get update && apt-get install -y \
-    libsndfile1 \
-    wget \
-    espeak-ng \
-    libespeak-ng-dev \
-    && rm -rf /var/lib/apt/lists/*
-
-# Pre-download models to cache
-RUN mkdir -p /app/models_cache
-RUN wget -q -O /app/models_cache/kokoro-v1.0.onnx https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0/kokoro-v1.0.onnx
-RUN wget -q -O /app/models_cache/voices-v1.0.bin https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0/voices-v1.0.bin
-
-# Pre-download NLLB model (CTranslate2 INT8)
-ARG HF_TOKEN
-ENV HF_TOKEN=$HF_TOKEN
-RUN pip install huggingface-hub
-RUN python3 -c "import os; from huggingface_hub import snapshot_download; snapshot_download(repo_id='Tushe/nllb-200-600M-ct2-int8', local_dir='/app/models_cache/nllb-model', token=os.environ.get('HF_TOKEN'))"
-
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-
-COPY . .
-RUN chmod +x start.sh
-
-# Create the Language Matrix Loop script within the container
-RUN cat <<'EOF' > /app/matrix_test.py
 import os
 import sys
 import time
@@ -159,8 +128,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-EOF
-
-EXPOSE 8000
-
-CMD ["./start.sh"]

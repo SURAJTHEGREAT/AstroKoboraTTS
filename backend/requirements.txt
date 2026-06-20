@@ -13,3 +13,5 @@ ctranslate2
 sentencepiece
 huggingface-hub
 transformers
+tabulate
+nltk

@@ -22,6 +22,18 @@ export default function Analytics() {
     setError(null);
 
     try {
+      // First verify credentials via the unified verify endpoint
+      const verifyRes = await fetch("/api/admin/verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, password }),
+      });
+
+      if (!verifyRes.ok) {
+        throw new Error("Invalid admin credentials");
+      }
+
+      // Then fetch analytics
       const response = await fetch("/api/analytics", {
         method: "POST",
         headers: {
@@ -36,7 +48,7 @@ export default function Analytics() {
       const result = await response.json();
 
       if (!response.ok) {
-        throw new Error(result.error || "Failed to authenticate or fetch data");
+        throw new Error(result.error || result.detail || "Failed to fetch analytics data");
       }
 
       setData(result);

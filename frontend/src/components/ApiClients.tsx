@@ -19,6 +19,17 @@ export default function ApiClients() {
     setGeneratedClient(null);
 
     try {
+      // First verify credentials via the unified verify endpoint
+      const verifyRes = await fetch("/api/admin/verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, password }),
+      });
+
+      if (!verifyRes.ok) {
+        throw new Error("Invalid admin credentials");
+      }
+
       const response = await fetch("/api/clients", {
         method: "POST",
         headers: {
@@ -34,7 +45,7 @@ export default function ApiClients() {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || "Failed to create API Client");
+        throw new Error(data.error || data.detail || "Failed to create API Client");
       }
 
       setSuccessMessage(data.message);

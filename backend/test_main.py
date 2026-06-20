@@ -1,7 +1,7 @@
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
-from main import app
+from main import app, ADMIN_USERNAME, ADMIN_PASSWORD
 from database import Base, get_db
 import pytest_asyncio
 import asyncio
@@ -27,6 +27,25 @@ async def override_get_db():
 app.dependency_overrides[get_db] = override_get_db
 
 client = TestClient(app)
+
+@pytest.mark.asyncio
+async def test_admin_verify_endpoint():
+    # Test with configured credentials
+    verify_data = {
+        "username": ADMIN_USERNAME,
+        "password": ADMIN_PASSWORD
+    }
+    response = client.post("/api/admin/verify", json=verify_data)
+    assert response.status_code == 200
+    assert response.json()["success"] is True
+
+    # Test with wrong credentials
+    verify_data = {
+        "username": "wrong",
+        "password": "wrong"
+    }
+    response = client.post("/api/admin/verify", json=verify_data)
+    assert response.status_code == 401
 
 @pytest.mark.asyncio
 async def test_direct_analytics():
@@ -64,8 +83,8 @@ async def test_direct_analytics():
 
         # 2. Check analytics
         analytics_data = {
-            "username": "admin",
-            "password": "kP9$vW2!mX7#qZ4"
+            "username": ADMIN_USERNAME,
+            "password": ADMIN_PASSWORD
         }
         response = client.post("/api/analytics", json=analytics_data)
         assert response.status_code == 200
@@ -94,8 +113,8 @@ def test_invalid_credentials_clients():
 
 def test_blend_voices():
     blend_data = {
-        "username": "admin",
-        "password": "kP9$vW2!mX7#qZ4",
+        "username": ADMIN_USERNAME,
+        "password": ADMIN_PASSWORD,
         "voiceName": "TestBlend",
         "voiceA": "af_heart",
         "voiceB": "am_adam",
@@ -115,8 +134,8 @@ def test_blend_voices():
 
 def test_blend_duplicate_name():
     blend_data = {
-        "username": "admin",
-        "password": "kP9$vW2!mX7#qZ4",
+        "username": ADMIN_USERNAME,
+        "password": ADMIN_PASSWORD,
         "voiceName": "Duplicate",
         "voiceA": "af_heart",
         "voiceB": "am_adam",

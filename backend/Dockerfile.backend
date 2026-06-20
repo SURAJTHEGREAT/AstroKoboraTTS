@@ -24,6 +24,9 @@ RUN python3 -c "import os; from huggingface_hub import snapshot_download; snapsh
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
+# Pre-download NLTK resources
+RUN python3 -m nltk.downloader punkt punkt_tab
+
 COPY . .
 RUN chmod +x start.sh
 

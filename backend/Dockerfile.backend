@@ -6,6 +6,8 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y \
     libsndfile1 \
     wget \
+    espeak-ng \
+    libespeak-ng-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # Pre-download models to cache

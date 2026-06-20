@@ -610,7 +610,7 @@ export default function Chat({ sessionId, messages, setMessages, input, setInput
               <button
                 type="submit"
                 data-testid="submit-button"
-                disabled={!input.trim() || sourceLang === targetLang}
+                disabled={!input.trim()}
                 className="p-3 bg-indigo-600 rounded-full hover:bg-indigo-500 transition-colors text-white disabled:opacity-50 disabled:hover:bg-indigo-600 shadow-sm"
               >
                 <Send size={18} />

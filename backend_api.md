@@ -48,17 +48,33 @@ The `/api/tts` endpoint receives text and streams back chunks of generated audio
 **Content-Type:** `application/json`
 
 **Parameters (JSON Body):**
-- `message` (string): The text you want to convert to speech.
-- `voice` (string): The voice to use (e.g., `af_heart` or a custom `voiceName`).
+- `message` (string, required): The text you want to convert to speech.
+- `voice` (string, optional): The voice to use (e.g., `af_heart` or a custom `voiceName`).
+- `source_lang` (string, optional): The NLLB language code for the input message (e.g., `eng_Latn`).
+- `target_lang` (string, optional): The NLLB language code to translate the message into before synthesis (e.g., `fra_Latn`).
+- `session_id` (string, optional): Unique ID for the session, used for audio file naming.
+- `message_id` (string, optional): Unique ID for the message, used for audio file naming.
 
-#### Example using `curl` (API Only Mode):
+#### Translation Support
+
+If `source_lang` and `target_lang` are provided and differ, the system will automatically translate the text using the NLLB-200 model before synthesis.
+
+**Supported NLLB Language Codes:**
+`eng_Latn` (English), `fra_Latn` (French), `spa_Latn` (Spanish), `ita_Latn` (Italian), `deu_Latn` (German), `jpn_Jpan` (Japanese), `hin_Deva` (Hindi), `por_Latn` (Portuguese), `zho_Hans` (Chinese).
+
+#### Example using `curl` (API Only Mode with Translation):
 
 ```bash
 curl -N -X POST http://localhost:8000/api/tts \
   -H "Content-Type: application/json" \
   -H "x-client-id: YOUR_CLIENT_ID" \
   -H "x-client-secret: YOUR_CLIENT_SECRET" \
-  -d '{"message": "Hello, this is a test.", "voice": "af_heart"}'
+  -d '{
+    "message": "Hello, this is a test.",
+    "voice": "af_heart",
+    "source_lang": "eng_Latn",
+    "target_lang": "spa_Latn"
+  }'
 ```
 
 **Note:** The `-N` or `--no-buffer` flag is important for SSE streams.

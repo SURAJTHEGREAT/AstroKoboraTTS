@@ -184,11 +184,57 @@ class TTSRequest(BaseModel):
     target_lang: Optional[str] = None
 
 def chunk_text(text: str, max_words: int = 10) -> List[str]:
-    words = text.split()
-    chunks = []
-    for i in range(0, len(words), max_words):
-        chunks.append(" ".join(words[i:i + max_words]))
-    return chunks
+    # Check if it contains CJK characters (Chinese, Japanese, Korean)
+    has_cjk = any('\u4e00' <= char <= '\u9fff' or  # Han
+                  '\u3040' <= char <= '\u309f' or  # Hiragana
+                  '\u30a0' <= char <= '\u30ff' or  # Katakana
+                  '\uac00' <= char <= '\ud7af'     # Hangul
+                  for char in text)
+
+    if has_cjk:
+        # Split by punctuation, keeping the punctuation with the preceding text
+        parts = re.split(r'([。！？!?，,；;：:\n])', text)
+        chunks = []
+        current_chunk = ""
+        max_cjk_len = max_words * 2
+
+        for i in range(0, len(parts) - 1, 2):
+            text_part = parts[i]
+            punct_part = parts[i+1]
+            combined = text_part + punct_part
+
+            if not combined.strip():
+                continue
+
+            if len(current_chunk) + len(combined) > max_cjk_len and current_chunk:
+                chunks.append(current_chunk.strip())
+                current_chunk = combined
+            else:
+                current_chunk += combined
+
+        if len(parts) % 2 == 1 and parts[-1].strip():
+            if len(current_chunk) + len(parts[-1]) > max_cjk_len and current_chunk:
+                chunks.append(current_chunk.strip())
+                current_chunk = parts[-1]
+            else:
+                current_chunk += parts[-1]
+
+        if current_chunk.strip():
+            current_chunk = current_chunk.strip()
+            if len(current_chunk) > max_cjk_len:
+                for i in range(0, len(current_chunk), max_cjk_len):
+                    chunk = current_chunk[i:i+max_cjk_len]
+                    if chunk.strip():
+                        chunks.append(chunk.strip())
+            else:
+                chunks.append(current_chunk)
+        return [c for c in chunks if c]
+    else:
+        words = text.split()
+        chunks = []
+        for i in range(0, len(words), max_words):
+            chunks.append(" ".join(words[i:i + max_words]))
+        return chunks
 
 def sanitize_id(id_str: Optional[str]) -> Optional[str]:
     if not id_str:

@@ -73,6 +73,16 @@ def main():
         input_text = "Hello, how are you today? I hope you are having a wonderful time."
         print(f"No input text provided. Using default: '{input_text}'\n")
 
+    # 1. Directory and File Management
+    report_dir = "translation_report"
+    os.makedirs(report_dir, exist_ok=True)
+
+    try:
+        with open(os.path.join(report_dir, "english.txt"), "w", encoding="utf-8") as f:
+            f.write(input_text)
+    except OSError as e:
+        print(f"Error saving original text: {e}")
+
     model_path = get_translation_model_path()
     if not os.path.exists(model_path):
         print(f"Error: Translation model not found at {model_path}")
@@ -112,6 +122,14 @@ def main():
         translated = translate(input_text, "eng_Latn", lang_code, translator, tokenizer)
         latency_ms = (time.time() - start_time) * 1000
 
+        # Save translated text
+        try:
+            filename = f"{lang_name.lower()}.txt"
+            with open(os.path.join(report_dir, filename), "w", encoding="utf-8") as f:
+                f.write(translated)
+        except OSError as e:
+            print(f"Error saving translation for {lang_name}: {e}")
+
         # Reverse translation
         round_trip = translate(translated, lang_code, "eng_Latn", translator, tokenizer)
 
@@ -127,7 +145,27 @@ def main():
             "Round Trip": round_trip
         })
 
-    # Prepare table results (with truncation)
+    # 2. Performance Metrics & Metrics Logging
+    metrics_summary_data = [["English", "Source", "N/A"]]
+    for r in results:
+        metrics_summary_data.append([
+            r["Language"],
+            f"{r['Accuracy (%)']}%",
+            f"{int(r['Latency (ms)'])}ms"
+        ])
+
+    summary_headers = ["Language", "Accuracy", "Latency"]
+    summary_table = tabulate(metrics_summary_data, headers=summary_headers, tablefmt="github")
+
+    print("\n" + summary_table)
+
+    try:
+        with open(os.path.join(report_dir, "metrics_summary.txt"), "w", encoding="utf-8") as f:
+            f.write(summary_table)
+    except OSError as e:
+        print(f"Error saving metrics summary: {e}")
+
+    # Prepare detailed table results (with truncation) for additional console output
     table_results = []
     for r in results:
         tr = r.copy()
@@ -137,6 +175,7 @@ def main():
             tr["Round Trip"] = tr["Round Trip"][:50] + "..."
         table_results.append(tr)
 
+    print("\nDetailed Matrix Results:")
     print(tabulate(table_results, headers="keys", tablefmt="grid"))
 
     if os.environ.get("OUTPUT_FORMAT") == "json":

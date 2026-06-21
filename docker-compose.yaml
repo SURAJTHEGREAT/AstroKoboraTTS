@@ -21,6 +21,7 @@ services:
       dockerfile: Dockerfile.backend
       args:
         - HF_TOKEN=${HF_TOKEN}
+        - INPUT_TEXT=${INPUT_TEXT}  
     ports:
       - "8000:8000"
     volumes:
@@ -28,3 +29,4 @@ services:
     environment:
       - NODE_ENV=development
       - HF_TOKEN=${HF_TOKEN}
+      - INPUT_TEXT=${INPUT_TEXT}  

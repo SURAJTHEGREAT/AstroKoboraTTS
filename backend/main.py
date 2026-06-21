@@ -184,11 +184,72 @@ class TTSRequest(BaseModel):
     target_lang: Optional[str] = None
 
 def chunk_text(text: str, max_words: int = 10) -> List[str]:
-    words = text.split()
-    chunks = []
-    for i in range(0, len(words), max_words):
-        chunks.append(" ".join(words[i:i + max_words]))
-    return chunks
+    # Check if it contains CJK characters (Chinese, Japanese, Korean)
+    has_cjk = any('\u4e00' <= char <= '\u9fff' or  # Han
+                  '\u3040' <= char <= '\u309f' or  # Hiragana
+                  '\u30a0' <= char <= '\u30ff' or  # Katakana
+                  '\uac00' <= char <= '\ud7af'     # Hangul
+                  for char in text)
+
+    if has_cjk:
+        # Split by punctuation, keeping the punctuation with the preceding text
+        parts = re.split(r'([。！？!?，,；;：:\n])', text)
+        chunks = []
+        current_chunk = ""
+
+        # Optimization: Use a smaller character limit for the very first chunk to improve TTFB
+        is_first_chunk = True
+
+        for i in range(0, len(parts) - 1, 2):
+            text_part = parts[i]
+            punct_part = parts[i+1]
+            combined = text_part + punct_part
+
+            if not combined.strip():
+                continue
+
+            # Determine limit for this chunk
+            limit = 10 if is_first_chunk else (max_words * 2)
+
+            if len(current_chunk) + len(combined) > limit and current_chunk:
+                chunks.append(current_chunk.strip())
+                current_chunk = combined
+                is_first_chunk = False
+            else:
+                current_chunk += combined
+
+        if len(parts) % 2 == 1 and parts[-1].strip():
+            limit = 10 if is_first_chunk else (max_words * 2)
+            if len(current_chunk) + len(parts[-1]) > limit and current_chunk:
+                chunks.append(current_chunk.strip())
+                current_chunk = parts[-1]
+                is_first_chunk = False
+            else:
+                current_chunk += parts[-1]
+
+        if current_chunk.strip():
+            current_chunk = current_chunk.strip()
+            limit = 10 if is_first_chunk else (max_words * 2)
+            if len(current_chunk) > limit:
+                # If first chunk is still too long after punctuation split, slice it
+                if is_first_chunk:
+                    chunks.append(current_chunk[:10])
+                    remaining = current_chunk[10:]
+                    if remaining:
+                        for i in range(0, len(remaining), max_words * 2):
+                            chunks.append(remaining[i:i + max_words * 2])
+                else:
+                    for i in range(0, len(current_chunk), max_words * 2):
+                        chunks.append(current_chunk[i:i + max_words * 2])
+            else:
+                chunks.append(current_chunk)
+        return [c for c in chunks if c]
+    else:
+        words = text.split()
+        chunks = []
+        for i in range(0, len(words), max_words):
+            chunks.append(" ".join(words[i:i + max_words]))
+        return chunks
 
 def sanitize_id(id_str: Optional[str]) -> Optional[str]:
     if not id_str:
@@ -201,6 +262,7 @@ async def translate_text(text: str, src_lang: str, tgt_lang: str) -> str:
         return text
 
     try:
+        start_time = time.perf_counter()
         nllb_tokenizer.src_lang = src_lang
 
         # Split text into sentences for batch processing.
@@ -214,6 +276,9 @@ async def translate_text(text: str, src_lang: str, tgt_lang: str) -> str:
         results = await asyncio.get_event_loop().run_in_executor(
             None,
             lambda: nllb_translator.translate_batch(
+                [source],
+                target_prefix=[[tgt_lang]],
+                beam_size=1,  # Greedier search for faster TTFB
                 tokenized_sentences,
                 target_prefix=[[tgt_lang]] * len(tokenized_sentences),
                 beam_size=2,
@@ -224,6 +289,12 @@ async def translate_text(text: str, src_lang: str, tgt_lang: str) -> str:
             )
         )
 
+        output_tokens = results[0].hypotheses[0]
+        output_ids = nllb_tokenizer.convert_tokens_to_ids(output_tokens)
+        translated_text = nllb_tokenizer.decode(output_ids, skip_special_tokens=True)
+        duration = (time.perf_counter() - start_time) * 1000
+        print(f"Translation from {src_lang} to {tgt_lang} took {duration:.2f}ms")
+        return translated_text
         translated_parts = []
         for result in results:
             output_tokens = result.hypotheses[0]
@@ -322,10 +393,14 @@ async def tts_endpoint(request: Request, body: TTSRequest, db: AsyncSession = De
             try:
                 # This could be run in a thread pool for true concurrency, but keeping simple for now
                 loop = asyncio.get_event_loop()
+                chunk_start = time.perf_counter()
                 samples, sample_rate = await loop.run_in_executor(
                     None,
                     lambda: kokoro_model.create(text_chunk, voice=actual_voice_style, speed=1.0, lang=kokoro_lang)
                 )
+                chunk_duration = (time.perf_counter() - chunk_start) * 1000
+                if i == 0:
+                    print(f"First audio chunk generation took {chunk_duration:.2f}ms")
 
                 filename = f"chunk-{int(time.time() * 1000)}-{i}.wav"
                 filepath = os.path.join(temp_dir, filename)

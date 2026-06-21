@@ -140,10 +140,10 @@ async def startup_event():
         try:
             print("Loading Translation model...")
             nllb_tokenizer = transformers.AutoTokenizer.from_pretrained(nllb_path)
-            # Use system core counts for intra_threads as required
-            cpu_count = multiprocessing.cpu_count()
+            # Use physical core counts for intra_threads as required for better performance
+            cpu_count = psutil.cpu_count(logical=False) or multiprocessing.cpu_count()
             nllb_translator = ctranslate2.Translator(nllb_path, device="cpu", intra_threads=cpu_count)
-            print(f"Translation Model successfully loaded with {cpu_count} intra_threads!")
+            print(f"Translation Model {nllb_repo} successfully loaded with {cpu_count} intra_threads (physical cores)!")
         except Exception as e:
             print(f"Failed to load Translation model: {e}")
 
@@ -202,23 +202,36 @@ async def translate_text(text: str, src_lang: str, tgt_lang: str) -> str:
 
     try:
         nllb_tokenizer.src_lang = src_lang
-        source = nllb_tokenizer.convert_ids_to_tokens(nllb_tokenizer.encode(text))
+
+        # Split text into sentences for batch processing.
+        # Robust split to avoid breaking on common abbreviations like Mr. or Dr.
+        sentences = [s.strip() for s in re.split(r'(?<!\w\.\w.)(?<![A-Z][a-z]\.)(?<=[.!?])\s+', text.strip()) if s.strip()]
+        if not sentences:
+            return text
+
+        tokenized_sentences = [nllb_tokenizer.convert_ids_to_tokens(nllb_tokenizer.encode(s)) for s in sentences]
 
         results = await asyncio.get_event_loop().run_in_executor(
             None,
             lambda: nllb_translator.translate_batch(
-                [source],
-                target_prefix=[[tgt_lang]],
-                beam_size=4,
+                tokenized_sentences,
+                target_prefix=[[tgt_lang]] * len(tokenized_sentences),
+                beam_size=2,
+                max_batch_size=1024,
+                batch_type="tokens",
                 max_decoding_length=256,
                 repetition_penalty=1.2
             )
         )
 
-        output_tokens = results[0].hypotheses[0]
-        output_ids = nllb_tokenizer.convert_tokens_to_ids(output_tokens)
-        translated_text = nllb_tokenizer.decode(output_ids, skip_special_tokens=True)
-        return translated_text
+        translated_parts = []
+        for result in results:
+            output_tokens = result.hypotheses[0]
+            output_ids = nllb_tokenizer.convert_tokens_to_ids(output_tokens)
+            part = nllb_tokenizer.decode(output_ids, skip_special_tokens=True)
+            translated_parts.append(part)
+
+        return " ".join(translated_parts)
     except Exception as e:
         print(f"Translation error: {e}")
         return text

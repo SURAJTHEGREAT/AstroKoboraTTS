@@ -21,6 +21,7 @@ We maintain a detailed technical wiki structured from first principles to help y
 - **[2. Core Architecture](wiki/2-core-architecture.md)**
   - [2.1 Application Interface](wiki/2.1-application-interface.md)
   - [2.2 Model Execution](wiki/2.2-model-execution.md)
+  - [2.3 GPU-Accelerated Architecture](wiki/architecture_gpu_updated.md)
 - **[3. User Interfaces](wiki/3-user-interfaces.md)**
   - [3.1 Web Interface](wiki/3.1-web-interface.md)
   - [3.2 Command Line Tools](wiki/3.2-command-line-tools.md)

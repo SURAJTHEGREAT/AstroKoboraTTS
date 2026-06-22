@@ -1,6 +1,7 @@
 fastapi[standard]
 uvicorn
-kokoro-onnx
+kokoro-onnx[gpu]>=0.3.6
+onnxruntime-gpu>=1.20.1
 soundfile
 sqlalchemy
 aiosqlite
@@ -9,7 +10,7 @@ pytest
 httpx
 pytest-asyncio
 psutil
-ctranslate2
+ctranslate2[cuda]
 sentencepiece
 huggingface-hub
 transformers

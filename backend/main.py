@@ -18,6 +18,7 @@ import numpy as np
 import psutil
 import ctranslate2
 import transformers
+import onnxruntime as ort
 from huggingface_hub import snapshot_download
 import multiprocessing
 
@@ -116,9 +117,21 @@ async def startup_event():
 
     if os.path.exists(model_path) and os.path.exists(voices_path):
         try:
-            print("Loading Kokoro ONNX model...")
-            kokoro_model = Kokoro(model_path, voices_path)
-            print("Kokoro TTS Model successfully loaded!")
+            print("Loading Kokoro ONNX model with GPU acceleration...")
+
+            sess_options = ort.SessionOptions()
+            sess_options.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
+
+            providers = [
+                ("CUDAExecutionProvider", {
+                    "cudnn_conv_algo_search": "DEFAULT",
+                }),
+                "CPUExecutionProvider",
+            ]
+
+            inf_sess = ort.InferenceSession(model_path, providers=providers, sess_options=sess_options)
+            kokoro_model = Kokoro.from_session(inf_sess, voices_path)
+            print(f"Kokoro TTS Model successfully loaded with providers: {inf_sess.get_providers()}")
         except Exception as e:
             print(f"Failed to load Kokoro ONNX model: {e}")
     else:
@@ -138,12 +151,16 @@ async def startup_event():
 
     if os.path.exists(nllb_path):
         try:
-            print("Loading Translation model...")
+            print("Loading Translation model on GPU...")
             nllb_tokenizer = transformers.AutoTokenizer.from_pretrained(nllb_path)
-            # Use physical core counts for intra_threads as required for better performance
-            cpu_count = psutil.cpu_count(logical=False) or multiprocessing.cpu_count()
-            nllb_translator = ctranslate2.Translator(nllb_path, device="cpu", intra_threads=cpu_count)
-            print(f"Translation Model {nllb_repo} successfully loaded with {cpu_count} intra_threads (physical cores)!")
+            # Use GPU for translation
+            nllb_translator = ctranslate2.Translator(
+                nllb_path,
+                device="cuda",
+                device_index=0,
+                compute_type="int8"
+            )
+            print(f"Translation Model {nllb_repo} successfully loaded on GPU!")
         except Exception as e:
             print(f"Failed to load Translation model: {e}")
 

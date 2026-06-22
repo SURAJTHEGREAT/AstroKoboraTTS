@@ -1,6 +1,11 @@
 #!/bin/bash
 set -e
 
+# Enable Maximum Performance Mode for Jetson AGX Orin
+echo "Setting Jetson to MAXN power mode and locking clocks..."
+nvpmodel -m 0 || true
+jetson_clocks || true
+
 # Ensure data directory exists
 mkdir -p /app/data/models
 

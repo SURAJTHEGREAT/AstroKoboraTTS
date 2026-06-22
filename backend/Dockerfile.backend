@@ -1,9 +1,10 @@
-FROM python:3.11-slim
+FROM nvcr.io/nvidia/l4t-jetpack
 
 WORKDIR /app
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
+    python3-pip \
     libsndfile1 \
     wget \
     espeak-ng \
@@ -18,11 +19,11 @@ RUN wget -q -O /app/models_cache/voices-v1.0.bin https://github.com/thewh1teagle
 # Pre-download NLLB model (CTranslate2 INT8)
 ARG HF_TOKEN
 ENV HF_TOKEN=$HF_TOKEN
-RUN pip install huggingface-hub
+RUN pip3 install huggingface-hub
 RUN python3 -c "import os; from huggingface_hub import snapshot_download; snapshot_download(repo_id='Tushe/nllb-200-600M-ct2-int8', local_dir='/app/models_cache/nllb-model', token=os.environ.get('HF_TOKEN'))"
 
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip3 install --no-cache-dir -r requirements.txt --extra-index-url https://pypi.nvidia.com
 
 # Pre-download NLTK resources
 RUN python3 -m nltk.downloader punkt punkt_tab

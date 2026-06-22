@@ -29,4 +29,12 @@ services:
     environment:
       - NODE_ENV=development
       - HF_TOKEN=${HF_TOKEN}
-      - INPUT_TEXT=${INPUT_TEXT}  
+      - INPUT_TEXT=${INPUT_TEXT}
+    privileged: true
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]

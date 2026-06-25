@@ -14,5 +14,6 @@ coverage/
 # Test reports
 html/
 __pycache__/
+temp_kokoro_chunks/
 backend/temp_kokoro_chunks/
 venv

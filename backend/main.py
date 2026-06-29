@@ -71,6 +71,10 @@ kokoro_model: Optional[Any] = None
 nllb_translator: Optional[Any] = None
 nllb_tokenizer: Optional[Any] = None
 
+# Admin credentials from environment
+ADMIN_USERNAME = os.environ.get("ADMIN_USERNAME", "admin")
+ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "change_me_in_production")
+
 # NLLB Language Prefix Mapping
 NLLB_LANG_MAP = {
     "eng_Latn": {"name": "English", "kokoro_lang": "en-us", "default_voice": "af_heart"},
@@ -139,7 +143,7 @@ async def startup_event():
     if os.path.exists(nllb_path):
         try:
             print("Loading Translation model...")
-            nllb_tokenizer = transformers.AutoTokenizer.from_pretrained(nllb_path)
+            nllb_tokenizer = transformers.AutoTokenizer.from_pretrained(nllb_path, fix_mistral_regex=True)
             # Use physical core counts for intra_threads as required for better performance
             cpu_count = psutil.cpu_count(logical=False) or multiprocessing.cpu_count()
             nllb_translator = ctranslate2.Translator(nllb_path, device="cpu", intra_threads=cpu_count)
@@ -216,8 +220,8 @@ async def translate_text(text: str, src_lang: str, tgt_lang: str) -> str:
             lambda: nllb_translator.translate_batch(
                 tokenized_sentences,
                 target_prefix=[[tgt_lang]] * len(tokenized_sentences),
-                beam_size=2,
-                max_batch_size=1024,
+                beam_size=1,  # Greedier search for faster TTFB
+                max_batch_size=16,
                 batch_type="tokens",
                 max_decoding_length=256,
                 repetition_penalty=1.2
@@ -231,7 +235,10 @@ async def translate_text(text: str, src_lang: str, tgt_lang: str) -> str:
             part = nllb_tokenizer.decode(output_ids, skip_special_tokens=True)
             translated_parts.append(part)
 
-        return " ".join(translated_parts)
+        translated_text = " ".join(translated_parts)
+        duration = (time.perf_counter() - start_time) * 1000
+        print(f"Translation from {src_lang} to {tgt_lang} took {duration:.2f}ms")
+        return translated_text
     except Exception as e:
         print(f"Translation error: {e}")
         return text
@@ -430,6 +437,16 @@ async def clear_session(session_id: str):
                 pass
     return {"success": True}
 
+class AdminVerifyRequest(BaseModel):
+    username: str
+    password: str
+
+@app.post("/api/admin/verify")
+async def verify_admin(body: AdminVerifyRequest):
+    if body.username != ADMIN_USERNAME or body.password != ADMIN_PASSWORD:
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+    return {"success": True}
+
 class BlendRequest(BaseModel):
     username: str
     password: str
@@ -440,7 +457,7 @@ class BlendRequest(BaseModel):
 
 @app.post("/api/blend")
 async def blend_endpoint(body: BlendRequest, db: AsyncSession = Depends(get_db)):
-    if body.username != "admin" or body.password != "kP9$vW2!mX7#qZ4":
+    if body.username != ADMIN_USERNAME or body.password != ADMIN_PASSWORD:
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
     if not body.voiceName:
@@ -470,7 +487,7 @@ class ClientRequest(BaseModel):
 
 @app.post("/api/clients")
 async def create_client(body: ClientRequest, db: AsyncSession = Depends(get_db)):
-    if body.username != "admin" or body.password != "kP9$vW2!mX7#qZ4":
+    if body.username != ADMIN_USERNAME or body.password != ADMIN_PASSWORD:
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
     client_id = "client_" + secrets.token_hex(16)
@@ -500,7 +517,7 @@ class AnalyticsRequest(BaseModel):
 
 @app.post("/api/analytics")
 async def get_analytics(body: AnalyticsRequest, db: AsyncSession = Depends(get_db)):
-    if body.username != "admin" or body.password != "kP9$vW2!mX7#qZ4":
+    if body.username != ADMIN_USERNAME or body.password != ADMIN_PASSWORD:
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
     # Group by client and get stats

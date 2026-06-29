@@ -17,6 +17,9 @@ The system is composed of the following major components:
    - Can run in an "API-only" mode (`API_ONLY=true`) to bypass static file serving for headless integrations.
    - Interfaces directly with the SQLite database for metadata management and the file system for audio/model storage.
 
+2.5 **Translation Engine (NLLB-200 & CTranslate2)**:
+   - Local-first Neural Machine Translation engine.
+   - Translates input text between supported languages before it reaches the TTS synthesis stage.
 3. **Inference Engine (`kokoro-onnx` & ONNX Runtime)**:
    - Embedded directly within the Python backend process.
    - Executes the pre-trained `Kokoro-82M-v1.0-ONNX` model using the ONNX Runtime for CPU.
@@ -28,4 +31,4 @@ The system is composed of the following major components:
 
 ## Execution Flow Summary
 
-When a user requests speech generation, the FastAPI backend receives the text and delegates it to the embedded `kokoro-onnx` instance. The ONNX model processes the text and streams the output directly back through the FastAPI server as audio chunks via SSE, while simultaneously logging usage statistics to the SQLite database.
+When a user requests speech generation, the FastAPI backend receives the text and delegates it to the translation engine (if needed) and then the embedded `kokoro-onnx` instance. The ONNX model processes the text and streams the output directly back through the FastAPI server as audio chunks via SSE, while simultaneously logging usage statistics to the SQLite database.

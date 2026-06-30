@@ -38,6 +38,7 @@ Regardless of the method you choose, ensure you have the following installed on 
    cd backend
    pip install -r requirements.txt
    # Download the ONNX models into data/models
+   # The NLLB-200 translation model will be automatically downloaded and cached in backend/models_cache upon first use.
    uvicorn main:app --reload --port 8000
    ```
 

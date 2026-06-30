@@ -16,6 +16,7 @@ At its core, a Text-to-Speech system aims to convert written human language (tex
 - **Real-Time Streaming**: By leveraging Server-Sent Events (SSE), the application can stream audio chunks to the frontend as they are generated, rather than waiting for the entire text to be processed.
 - **Custom Voice Blending**: Allows users to blend existing voices to create unique voice embeddings stored locally and tracked via SQLite.
 - **Full-Stack Integration**: Provides a comprehensive React frontend for user interaction and an FastAPI backend for API management.
+- **Local Translation**: Uses NLLB-200 and CTranslate2 to provide high-quality, local-only translation across multiple languages before speech synthesis.
 - **Analytics & Tracking**: Tracks API usage, words processed, and Time To First Byte (TTFB) to monitor performance.
 
 By keeping all these processes localized and utilizing efficient ONNX inference engines, Kokoro TTS provides a robust, fast, and completely private text-to-speech solution.

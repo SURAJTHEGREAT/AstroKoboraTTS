@@ -28,7 +28,7 @@ This document provides instructions on how to build and run the Kokoro TTS appli
    docker-compose up --build
    ```
 
-   *Note: The backend Docker build process will download the large ONNX model files (`kokoro-v1.0.onnx` and `voices-v1.0.bin`) into the Docker image cache. This ensures the files are only downloaded once during the build process. When the backend container starts, it will copy these files to the persistent `data/models` directory if they don't already exist.*
+   *Note: The backend Docker build process will download the large ONNX model files (`kokoro-v1.0.onnx`, `voices-v1.0.bin`, and the NLLB-200 translation model) into the Docker image cache. This ensures the files are only downloaded once during the build process. When the backend container starts, it will copy these files to the persistent `data/models` directory if they don't already exist.*
 
 3. **Access the Application**
    - **Frontend UI:** Open your browser to [http://localhost:3000](http://localhost:3000)

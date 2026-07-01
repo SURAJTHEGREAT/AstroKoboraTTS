@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useMemo } from "react";
-import { Mic, Send, Loader2, Volume2, User, Bot, Globe, Sparkles, Square, Save, CircleOff, ChevronUp } from "lucide-react";
+import { Mic, Send, Loader2, Volume2, User, Bot, Globe, Sparkles, Square, Save, CircleOff, ChevronUp, Languages } from "lucide-react";
 import { Link } from "react-router";
 import { v4 as uuidv4 } from 'uuid';
 import { generateRandomName } from "../utils/nameGenerator";
@@ -54,6 +54,8 @@ export default function Chat({ sessionId, messages, setMessages, input, setInput
   const [selectedVoice, setSelectedVoice] = useState("af_heart");
   const [customVoices, setCustomVoices] = useState<any[]>([]);
   const [currentlyPlayingId, setCurrentlyPlayingId] = useState<string | null>(null);
+  const [sourceLang, setSourceLang] = useState("eng_Latn");
+  const [targetLang, setTargetLang] = useState("eng_Latn");
   
   // Audio playback queue
   const audioQueue = useRef<{ url: string; id: string }[]>([]);
@@ -162,7 +164,7 @@ export default function Chat({ sessionId, messages, setMessages, input, setInput
     });
   };
 
-  const generateTTS = async (text: string, voice: string) => {
+  const generateTTS = async (text: string, voice: string, srcLang?: string, tgtLang?: string) => {
     const messageId = uuidv4();
     setIsGenerating(true);
     setCurrentlyPlayingId(messageId);
@@ -195,7 +197,9 @@ export default function Chat({ sessionId, messages, setMessages, input, setInput
           message: text,
           voice: voice,
           session_id: sessionId,
-          message_id: messageId
+          message_id: messageId,
+          source_lang: srcLang,
+          target_lang: tgtLang
         }),
       });
 
@@ -291,7 +295,7 @@ export default function Chat({ sessionId, messages, setMessages, input, setInput
     setInput("");
     setMessages(prev => [...prev, { id: uuidv4(), role: "user", content: userMessage }]);
 
-    await generateTTS(userMessage, selectedVoice);
+    await generateTTS(userMessage, selectedVoice, sourceLang, targetLang);
   };
 
   const handleApplyVoice = async (text: string) => {
@@ -387,10 +391,60 @@ export default function Chat({ sessionId, messages, setMessages, input, setInput
           </div>
         </div>
 
+        <div className="flex items-center gap-6">
+          <div className="flex items-center gap-2">
+             <label htmlFor="source-lang" className="text-xs font-semibold text-slate-600 font-mono flex items-center gap-1.5">
+                <Languages size={13} className="text-slate-400" /> Source:
+             </label>
+             <select
+                id="source-lang"
+                data-testid="source-lang"
+                value={sourceLang}
+                onChange={(e) => setSourceLang(e.target.value)}
+                disabled={isGenerating}
+                className="bg-white border border-slate-200 rounded px-2 py-1.5 text-xs font-semibold text-slate-700 outline-none focus:border-indigo-500 transition-all cursor-pointer shadow-xs"
+             >
+                <option value="eng_Latn">English</option>
+                <option value="fra_Latn">French</option>
+                <option value="spa_Latn">Spanish</option>
+                <option value="ita_Latn">Italian</option>
+                <option value="deu_Latn">German</option>
+                <option value="jpn_Jpan">Japanese</option>
+                <option value="hin_Deva">Hindi</option>
+                <option value="por_Latn">Portuguese</option>
+                <option value="zho_Hans">Chinese</option>
+             </select>
+          </div>
+
+          <div className="flex items-center gap-2">
+             <label htmlFor="target-lang" className="text-xs font-semibold text-slate-600 font-mono flex items-center gap-1.5">
+                <Languages size={13} className="text-slate-400" /> Target:
+             </label>
+             <select
+                id="target-lang"
+                data-testid="target-lang"
+                value={targetLang}
+                onChange={(e) => setTargetLang(e.target.value)}
+                disabled={isGenerating}
+                className="bg-white border border-slate-200 rounded px-2 py-1.5 text-xs font-semibold text-slate-700 outline-none focus:border-indigo-500 transition-all cursor-pointer shadow-xs"
+             >
+                <option value="eng_Latn">English</option>
+                <option value="fra_Latn">French</option>
+                <option value="spa_Latn">Spanish</option>
+                <option value="ita_Latn">Italian</option>
+                <option value="deu_Latn">German</option>
+                <option value="jpn_Jpan">Japanese</option>
+                <option value="hin_Deva">Hindi</option>
+                <option value="por_Latn">Portuguese</option>
+                <option value="zho_Hans">Chinese</option>
+             </select>
+          </div>
+        </div>
+
         <div className="flex items-center gap-3">
-          <label htmlFor="voice-select" className="text-xs font-semibold text-slate-600 font-mono flex items-center gap-1.5">
-            <Globe size={13} className="text-slate-400" /> System & Blended:
-          </label>
+            <label htmlFor="voice-select" className="text-xs font-semibold text-slate-600 font-mono flex items-center gap-1.5">
+              <Globe size={13} className="text-slate-400" /> System & Blended:
+            </label>
           <select
             id="voice-select"
             value={selectedVoice}
@@ -555,6 +609,7 @@ export default function Chat({ sessionId, messages, setMessages, input, setInput
             ) : (
               <button
                 type="submit"
+                data-testid="submit-button"
                 disabled={!input.trim()}
                 className="p-3 bg-indigo-600 rounded-full hover:bg-indigo-500 transition-colors text-white disabled:opacity-50 disabled:hover:bg-indigo-600 shadow-sm"
               >

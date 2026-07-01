@@ -6,6 +6,7 @@ This is a local, in-memory Text-to-Speech (TTS) application built using a modern
 
 - **Frontend (React)**: A single-page application built with React and Vite. It handles the UI for text input, audio playback, and admin settings (like voice blending). It uses Server-Sent Events (SSE) for receiving live audio chunks.
 - **Backend (FastAPI)**: A Python web server handling API endpoints using FastAPI.
+- **Local Translation (NLLB-200)**: Integrated multi-language translation engine using CTranslate2 and Meta’s NLLB-200, enabling on-the-fly translation before speech synthesis.
 - **Kokoro TTS Model (`kokoro-onnx`)**: The core TTS engine running inside the Python process using ONNX runtime.
 - **Persistent Storage**: Uses the local file system to store the base ONNX models and temporary audio chunks.
 - **Database (SQLite)**: Maintains metadata for blended voices, API clients, and performance analytics in a local `.db` file.

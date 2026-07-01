@@ -16,6 +16,10 @@ import re
 import soundfile as sf
 import numpy as np
 import psutil
+import ctranslate2
+import transformers
+from huggingface_hub import snapshot_download
+import multiprocessing
 
 from database import init_db, get_db, AsyncSessionLocal, Voice, ApiClient, ApiClientStat, TtsHistory
 
@@ -60,7 +64,29 @@ os.makedirs(temp_dir, exist_ok=True)
 session_audio_dir = os.path.join(data_dir, "session_audio")
 os.makedirs(session_audio_dir, exist_ok=True)
 
+translation_models_dir = os.path.join(data_dir, "translation_models")
+os.makedirs(translation_models_dir, exist_ok=True)
+
 kokoro_model: Optional[Any] = None
+nllb_translator: Optional[Any] = None
+nllb_tokenizer: Optional[Any] = None
+
+# Admin credentials from environment
+ADMIN_USERNAME = os.environ.get("ADMIN_USERNAME", "admin")
+ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "change_me_in_production")
+
+# NLLB Language Prefix Mapping
+NLLB_LANG_MAP = {
+    "eng_Latn": {"name": "English", "kokoro_lang": "en-us", "default_voice": "af_heart"},
+    "fra_Latn": {"name": "French", "kokoro_lang": "fr-fr", "default_voice": "ff_siwis"},
+    "spa_Latn": {"name": "Spanish", "kokoro_lang": "es", "default_voice": "ef_dora"},
+    "ita_Latn": {"name": "Italian", "kokoro_lang": "it", "default_voice": "if_sara"},
+    "deu_Latn": {"name": "German", "kokoro_lang": "de", "default_voice": "df_sarah"}, # Assuming German support or fallback
+    "jpn_Jpan": {"name": "Japanese", "kokoro_lang": "ja", "default_voice": "jf_alpha"},
+    "hin_Deva": {"name": "Hindi", "kokoro_lang": "hi", "default_voice": "hf_alpha"},
+    "por_Latn": {"name": "Portuguese", "kokoro_lang": "pt-br", "default_voice": "pf_dora"},
+    "zho_Hans": {"name": "Chinese", "kokoro_lang": "cmn", "default_voice": "zf_xiaobei"},
+}
 
 @app.on_event("startup")
 async def startup_event():
@@ -102,6 +128,29 @@ async def startup_event():
     else:
         print(f"Warning: Model files not found at {model_path} or {voices_path}. TTS will not work.")
 
+    # Initialize Translation Model
+    global nllb_translator, nllb_tokenizer
+    nllb_repo = "Tushe/nllb-200-600M-ct2-int8"
+    nllb_path = os.path.join(translation_models_dir, "nllb-200-600M-ct2-int8")
+
+    if not os.path.exists(nllb_path):
+        try:
+            print(f"Downloading translation model {nllb_repo}...")
+            snapshot_download(repo_id=nllb_repo, local_dir=nllb_path, token=os.environ.get("HF_TOKEN"))
+        except Exception as e:
+            print(f"Failed to download translation model: {e}")
+
+    if os.path.exists(nllb_path):
+        try:
+            print("Loading Translation model...")
+            nllb_tokenizer = transformers.AutoTokenizer.from_pretrained(nllb_path, fix_mistral_regex=True)
+            # Use physical core counts for intra_threads as required for better performance
+            cpu_count = psutil.cpu_count(logical=False) or multiprocessing.cpu_count()
+            nllb_translator = ctranslate2.Translator(nllb_path, device="cpu", intra_threads=cpu_count)
+            print(f"Translation Model {nllb_repo} successfully loaded with {cpu_count} intra_threads (physical cores)!")
+        except Exception as e:
+            print(f"Failed to load Translation model: {e}")
+
 async def api_auth_middleware(request: Request, db: AsyncSession = Depends(get_db)):
     if os.environ.get("API_ONLY") != "true":
         return None
@@ -135,6 +184,8 @@ class TTSRequest(BaseModel):
     voice: str = "af_heart"
     session_id: Optional[str] = None
     message_id: Optional[str] = None
+    source_lang: Optional[str] = None
+    target_lang: Optional[str] = None
 
 def chunk_text(text: str, max_words: int = 10) -> List[str]:
     words = text.split()
@@ -148,6 +199,50 @@ def sanitize_id(id_str: Optional[str]) -> Optional[str]:
         return None
     return re.sub(r'[^a-zA-Z0-9-]', '', id_str)
 
+async def translate_text(text: str, src_lang: str, tgt_lang: str) -> str:
+    if not nllb_translator or not nllb_tokenizer:
+        print("Translation model not loaded, skipping translation.")
+        return text
+
+    try:
+        nllb_tokenizer.src_lang = src_lang
+
+        # Split text into sentences for batch processing.
+        # Robust split to avoid breaking on common abbreviations like Mr. or Dr.
+        sentences = [s.strip() for s in re.split(r'(?<!\w\.\w.)(?<![A-Z][a-z]\.)(?<=[.!?])\s+', text.strip()) if s.strip()]
+        if not sentences:
+            return text
+
+        tokenized_sentences = [nllb_tokenizer.convert_ids_to_tokens(nllb_tokenizer.encode(s)) for s in sentences]
+
+        results = await asyncio.get_event_loop().run_in_executor(
+            None,
+            lambda: nllb_translator.translate_batch(
+                tokenized_sentences,
+                target_prefix=[[tgt_lang]] * len(tokenized_sentences),
+                beam_size=1,  # Greedier search for faster TTFB
+                max_batch_size=16,
+                batch_type="tokens",
+                max_decoding_length=256,
+                repetition_penalty=1.2
+            )
+        )
+
+        translated_parts = []
+        for result in results:
+            output_tokens = result.hypotheses[0]
+            output_ids = nllb_tokenizer.convert_tokens_to_ids(output_tokens)
+            part = nllb_tokenizer.decode(output_ids, skip_special_tokens=True)
+            translated_parts.append(part)
+
+        translated_text = " ".join(translated_parts)
+        duration = (time.perf_counter() - start_time) * 1000
+        print(f"Translation from {src_lang} to {tgt_lang} took {duration:.2f}ms")
+        return translated_text
+    except Exception as e:
+        print(f"Translation error: {e}")
+        return text
+
 @app.post("/api/tts")
 async def tts_endpoint(request: Request, body: TTSRequest, db: AsyncSession = Depends(get_db)):
     client = await api_auth_middleware(request, db)
@@ -159,10 +254,26 @@ async def tts_endpoint(request: Request, body: TTSRequest, db: AsyncSession = De
     if not message:
         raise HTTPException(status_code=400, detail="Message is required")
 
+    # Handle Translation & Language Mapping
+    kokoro_lang = "en-us"
+    requested_voice = body.voice
+
+    if body.source_lang and body.target_lang:
+        # Only translate if languages are different
+        if body.source_lang != body.target_lang:
+            print(f"Translating from {body.source_lang} to {body.target_lang}")
+            message = await translate_text(message, body.source_lang, body.target_lang)
+
+        # Always map target_lang to Kokoro lang and default voice if target_lang is provided
+        if body.target_lang in NLLB_LANG_MAP:
+            kokoro_lang = NLLB_LANG_MAP[body.target_lang]["kokoro_lang"]
+            # If requested voice is the default 'af_heart', override with language-specific default
+            if requested_voice == "af_heart":
+                requested_voice = NLLB_LANG_MAP[body.target_lang]["default_voice"]
+
     words_processed = len(message.split())
 
     # Check if voice exists natively, else simulate fallback
-    requested_voice = body.voice
     actual_voice_style = requested_voice
 
     # Check if it's a custom/blended voice in our DB
@@ -220,7 +331,7 @@ async def tts_endpoint(request: Request, body: TTSRequest, db: AsyncSession = De
                 loop = asyncio.get_event_loop()
                 samples, sample_rate = await loop.run_in_executor(
                     None,
-                    lambda: kokoro_model.create(text_chunk, voice=actual_voice_style, speed=1.0, lang="en-us")
+                    lambda: kokoro_model.create(text_chunk, voice=actual_voice_style, speed=1.0, lang=kokoro_lang)
                 )
 
                 filename = f"chunk-{int(time.time() * 1000)}-{i}.wav"
@@ -326,6 +437,16 @@ async def clear_session(session_id: str):
                 pass
     return {"success": True}
 
+class AdminVerifyRequest(BaseModel):
+    username: str
+    password: str
+
+@app.post("/api/admin/verify")
+async def verify_admin(body: AdminVerifyRequest):
+    if body.username != ADMIN_USERNAME or body.password != ADMIN_PASSWORD:
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+    return {"success": True}
+
 class BlendRequest(BaseModel):
     username: str
     password: str
@@ -336,7 +457,7 @@ class BlendRequest(BaseModel):
 
 @app.post("/api/blend")
 async def blend_endpoint(body: BlendRequest, db: AsyncSession = Depends(get_db)):
-    if body.username != "admin" or body.password != "kP9$vW2!mX7#qZ4":
+    if body.username != ADMIN_USERNAME or body.password != ADMIN_PASSWORD:
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
     if not body.voiceName:
@@ -366,7 +487,7 @@ class ClientRequest(BaseModel):
 
 @app.post("/api/clients")
 async def create_client(body: ClientRequest, db: AsyncSession = Depends(get_db)):
-    if body.username != "admin" or body.password != "kP9$vW2!mX7#qZ4":
+    if body.username != ADMIN_USERNAME or body.password != ADMIN_PASSWORD:
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
     client_id = "client_" + secrets.token_hex(16)
@@ -396,7 +517,7 @@ class AnalyticsRequest(BaseModel):
 
 @app.post("/api/analytics")
 async def get_analytics(body: AnalyticsRequest, db: AsyncSession = Depends(get_db)):
-    if body.username != "admin" or body.password != "kP9$vW2!mX7#qZ4":
+    if body.username != ADMIN_USERNAME or body.password != ADMIN_PASSWORD:
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
     # Group by client and get stats

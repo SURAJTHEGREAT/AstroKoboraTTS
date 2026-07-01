@@ -4,7 +4,7 @@ This document provides a detailed overview of the application architecture, expl
 
 ## High-Level Architecture
 
-The application is built using a modern architecture, featuring a React frontend and a Python FastAPI backend, and leverages `kokoro-onnx` to perform local, in-memory Text-to-Speech (TTS) generation using an ONNX model. The backend also supports an admin feature to blend voices and save custom voice recordings with SQLite as a metadata store.
+The application is built using a modern architecture, featuring a React frontend and a Python FastAPI backend, and leverages `kokoro-onnx` and `ctranslate2` to perform local, in-memory Text-to-Speech (TTS) generation using an ONNX model. The backend also supports an admin feature to blend voices and save custom voice recordings with SQLite as a metadata store.
 
 ![Anatomy of Local Speech Pipeline](images/anatomy_of_local_speech_pipeline.png)
 
@@ -15,6 +15,8 @@ The application is built using a modern architecture, featuring a React frontend
    - Uses Server-Sent Events (SSE) to receive live chunks of audio processing status and URLs from the server.
 2. **Backend (FastAPI)**:
    - A Python web server handling the API endpoints (`/api/tts`, `/api/blend`, `/api/voices`).
+2.5 **Translation Engine (NLLB-200)**:
+   - A local Neural Machine Translation (NMT) model using Meta’s NLLB-200 (quantized to INT8) via CTranslate2. It handles multi-language translation before synthesis.
 3. **Kokoro TTS Model (`kokoro-onnx`)**:
    - The core text-to-speech engine running entirely inside the Python process using ONNX runtime. It avoids external API calls for voice generation.
 4. **Persistent Storage (File System)**:
@@ -30,6 +32,7 @@ sequenceDiagram
     participant User
     participant Frontend
     participant FastAPI as Backend (FastAPI)
+    participant NMT as Translation Engine (NLLB-200)
     participant Kokoro as Kokoro TTS (ONNX)
     participant FS as File System
     participant SQLite as Database (SQLite)
@@ -39,6 +42,8 @@ sequenceDiagram
     Note over User, SQLite: Text-to-Speech Generation
     User->>Frontend: Enter Text & Click "Generate"
     Frontend->>FastAPI: POST /api/tts (text, voice)
+    FastAPI->>NMT: Translate text (if source_lang != target_lang)
+    NMT-->>FastAPI: Return Translated Text
     FastAPI->>Kokoro: Load Model (if not loaded) & Stream Text
     Kokoro-->>FastAPI: Yield Audio Chunks
     FastAPI->>FS: Save chunk to temp folder (.wav)
@@ -92,3 +97,8 @@ Kokoro TTS is an efficient text-to-speech model. The specific version used here 
 5. **Vocoder**:
    - A vocoder processes the Mel-spectrogram and synthesizes the final raw audio waveform.
    - The `kokoro-onnx` library handles the streaming output of this audio, allowing the FastAPI server to pipe `.wav` chunks directly to the user before the entire sentence has finished generating.
+
+6. **Translation Engine (NLLB-200)**:
+   - The translation stage utilizes the NLLB-200 model (distilled-600M variant) quantized to INT8 for efficient local execution.
+   - **CTranslate2**: The inference engine used for NLLB, optimized for high throughput and low memory usage on both CPU and GPU.
+   - **Pipeline Integration**: When a request includes different source and target languages, the backend first passes the input text to the translation engine. The resulting translated text is then fed into the Kokoro TTS pipeline for speech synthesis.

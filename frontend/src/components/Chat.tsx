@@ -152,11 +152,12 @@ export default function Chat({ sessionId, messages, setMessages, input, setInput
     setIsGenerating(false);
     setCurrentlyPlayingId(null);
 
-    // Mark last assistant message as interrupted
+    // Mark last assistant message as interrupted and update word count
     setMessages(prev => {
       const last = prev[prev.length - 1];
       if (last && last.role === "assistant" && last.status === "generating") {
-        return [...prev.slice(0, -1), { ...last, status: "interrupted" }];
+        const actualWords = last.content ? last.content.trim().split(/\s+/).filter(w => w !== "").length : 0;
+        return [...prev.slice(0, -1), { ...last, status: "interrupted", totalWords: actualWords }];
       }
       return prev;
     });
@@ -170,7 +171,6 @@ export default function Chat({ sessionId, messages, setMessages, input, setInput
     abortController.current = new AbortController();
 
     // Add initial empty assistant message
-    const totalWords = text.trim().split(/\s+/).length;
     const tagName = generateRandomName();
 
     setMessages(prev => [...prev, {
@@ -180,7 +180,7 @@ export default function Chat({ sessionId, messages, setMessages, input, setInput
       voice: voice,
       status: "generating",
       ramMetrics: [],
-      totalWords: totalWords,
+      totalWords: 0,
       tagName: tagName
     }]);
 
@@ -231,8 +231,9 @@ export default function Chat({ sessionId, messages, setMessages, input, setInput
                 if (data.status === "text") {
                   accumulatedText += data.text;
                   setCurrentResponse(accumulatedText);
+                  const currentWords = accumulatedText ? accumulatedText.trim().split(/\s+/).filter(w => w !== "").length : 0;
                   setMessages(prev => prev.map(m =>
-                    m.id === messageId ? { ...m, content: accumulatedText } : m
+                    m.id === messageId ? { ...m, content: accumulatedText, totalWords: currentWords } : m
                   ));
                 } else if (data.status === "audio" && data.audioUrl) {
                   enqueueAudio(data.audioUrl, messageId);
@@ -252,8 +253,9 @@ export default function Chat({ sessionId, messages, setMessages, input, setInput
                   }
                 } else if (data.status === "done" && data.audioUrl) {
                    // This is the final concatenated URL
+                   const finalWords = accumulatedText ? accumulatedText.trim().split(/\s+/).filter(w => w !== "").length : 0;
                    setMessages(prev => prev.map(m =>
-                    m.id === messageId ? { ...m, status: "finished", audioUrl: data.audioUrl } : m
+                    m.id === messageId ? { ...m, status: "finished", audioUrl: data.audioUrl, totalWords: finalWords } : m
                   ));
                 }
               } catch (parseError) {
@@ -439,8 +441,8 @@ export default function Chat({ sessionId, messages, setMessages, input, setInput
             const isLastMessage = idx === messages.length - 1;
             return (
               <div key={msg.id} id={`msg-${msg.id}`} className={`flex gap-4 ${msg.role === "user" ? "flex-row-reverse" : ""}`}>
-                <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${msg.role === "user" ? "bg-slate-200 text-slate-700" : "bg-indigo-600 text-white shadow-xs"}`}>
-                  {msg.role === "user" ? "US" : "TTS"}
+                <div className={`flex-shrink-0 ${msg.role === "user" ? "w-8 h-8 rounded-full text-xs" : "px-2.5 py-1.5 h-8 rounded-full text-[10px]"} flex items-center justify-center font-bold ${msg.role === "user" ? "bg-slate-200 text-slate-700" : "bg-indigo-600 text-white shadow-xs"}`}>
+                  {msg.role === "user" ? "US" : msg.tagName}
                 </div>
                 <div className={`p-4 max-w-lg ${msg.role === "user" ? "bg-slate-100 border border-slate-200/60 rounded-2xl rounded-tr-none" : "bg-indigo-50 border border-indigo-100 rounded-2xl rounded-tl-none"}`}>
                   <p className="text-sm leading-relaxed text-slate-800 whitespace-pre-wrap">
@@ -514,8 +516,8 @@ export default function Chat({ sessionId, messages, setMessages, input, setInput
         
         {isGenerating && !currentResponse && (
           <div className="flex gap-4">
-            <div className="flex-shrink-0 w-8 h-8 rounded-full bg-indigo-600 flex items-center justify-center text-xs font-bold text-white shadow-xs">
-              TTS
+            <div className="flex-shrink-0 px-2.5 py-1.5 h-8 rounded-full bg-indigo-600 flex items-center justify-center text-[10px] font-bold text-white shadow-xs">
+              GENERATING
             </div>
             <div className="bg-indigo-50 border border-indigo-100 p-4 rounded-2xl rounded-tl-none max-w-lg">
                 <div className="flex items-center gap-3">

@@ -62,6 +62,10 @@ os.makedirs(session_audio_dir, exist_ok=True)
 
 kokoro_model: Optional[Any] = None
 
+# Admin credentials
+ADMIN_USERNAME = os.environ.get("ADMIN_USERNAME", "admin")
+ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "change_me_in_production")
+
 @app.on_event("startup")
 async def startup_event():
     await init_db()
@@ -336,7 +340,7 @@ class BlendRequest(BaseModel):
 
 @app.post("/api/blend")
 async def blend_endpoint(body: BlendRequest, db: AsyncSession = Depends(get_db)):
-    if body.username != "admin" or body.password != "kP9$vW2!mX7#qZ4":
+    if body.username != ADMIN_USERNAME or body.password != ADMIN_PASSWORD:
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
     if not body.voiceName:
@@ -366,7 +370,7 @@ class ClientRequest(BaseModel):
 
 @app.post("/api/clients")
 async def create_client(body: ClientRequest, db: AsyncSession = Depends(get_db)):
-    if body.username != "admin" or body.password != "kP9$vW2!mX7#qZ4":
+    if body.username != ADMIN_USERNAME or body.password != ADMIN_PASSWORD:
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
     client_id = "client_" + secrets.token_hex(16)
@@ -396,7 +400,7 @@ class AnalyticsRequest(BaseModel):
 
 @app.post("/api/analytics")
 async def get_analytics(body: AnalyticsRequest, db: AsyncSession = Depends(get_db)):
-    if body.username != "admin" or body.password != "kP9$vW2!mX7#qZ4":
+    if body.username != ADMIN_USERNAME or body.password != ADMIN_PASSWORD:
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
     # Group by client and get stats
@@ -424,6 +428,16 @@ async def get_analytics(body: AnalyticsRequest, db: AsyncSession = Depends(get_d
         })
 
     return stats
+
+class AdminVerifyRequest(BaseModel):
+    username: str
+    password: str
+
+@app.post("/api/admin/verify")
+async def verify_admin(body: AdminVerifyRequest):
+    if body.username != ADMIN_USERNAME or body.password != ADMIN_PASSWORD:
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+    return {"success": True}
 
 @app.get("/api/voices")
 async def get_voices(request: Request, db: AsyncSession = Depends(get_db)):

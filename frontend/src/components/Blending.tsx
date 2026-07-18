@@ -35,13 +35,22 @@ export default function Blending() {
   const [status, setStatus] = useState<"idle" | "success" | "error">("idle");
   const [message, setMessage] = useState("");
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (username === "admin" && password === "kP9$vW2!mX7#qZ4") {
-      setIsAuthenticated(true);
-      setLoginError("");
-    } else {
-      setLoginError("Invalid admin credentials");
+    try {
+      const response = await fetch("/api/admin/verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, password }),
+      });
+      if (response.ok) {
+        setIsAuthenticated(true);
+        setLoginError("");
+      } else {
+        setLoginError("Invalid admin credentials");
+      }
+    } catch (err) {
+      setLoginError("Error connecting to server");
     }
   };
 
